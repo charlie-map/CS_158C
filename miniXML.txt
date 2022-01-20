@@ -1,0 +1,17 @@
+<xml>
+	<page>
+		<id>25</id>
+		<title>Random Information</title>
+		<text>I am random information you don't need</text>
+	</page>
+	<page>
+		<id>26</id>
+		<title>More Information</title>
+		<text>There are a lot of bytes in this page element</text>
+	</page>
+	<post>
+		<id>27</id>
+		<title>Beach Vacation Day</title>
+		<text>Maybe add an Instagram post to spice things up</text>
+	</post>
+</xml>
