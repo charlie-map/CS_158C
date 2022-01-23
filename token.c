@@ -62,21 +62,22 @@ int add_token_attribute(token_t *token, char *tag, char *attribute) {
 	return 0;
 }
 
-int add_token_children(token_t *token, token_t *child) {
-	token_t token_parent = *token;
+int add_token_children(token_t *token_parent, token_t *child) {
+	token_parent->children[token_parent->children_index] = child;
 
-	token_parent.children[token_parent.children_index] = child;
-
-	token_parent.children_index++;
+	token_parent->children_index++;
 
 	// check for resize
-	token_parent.children = resize_arraylist(token_parent.children, &token_parent.max_children, token_parent.children_index);
+	token_parent->children = resize_arraylist(token_parent->children, &token_parent->max_children, token_parent->children_index);
 
 	return 0;
 }
 
 token_t *grab_token_children(token_t *parent) {
-	return parent->children[parent->children_index];
+	if (parent->children_index == 0)
+		return NULL;
+
+	return parent->children[parent->children_index - 1];
 }
 
 token_t *grab_token_parent(token_t *curr_token) {
@@ -156,14 +157,15 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 				read_tag = 0;
 
 				start_attr_value = 0;
+
+				search_token++;
 				continue;
-			} else if ((*curr_line)[search_token - 1] == ' ') {
+			} else if (attr_tag_name_index > 0 && (*curr_line)[search_token - 1] == ' ') {
 				// this means there was no attr value, so add this
 				// with a NULL value and move into the next one
 				char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
 				strcpy(tag_name, attr_tag_name);
 
-				printf("add attribute %s and %s\n", tag_name, attr_tag_value);
 				add_token_attribute(new_tree, tag_name, NULL);
 
 				attr_tag_name_index = 0;
@@ -183,8 +185,6 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 
 					char *attr = malloc(sizeof(char) * attr_tag_value_index + 1);
 					strcpy(attr, attr_tag_value);
-
-					printf("add full token %s and %s\n", tag_name, attr);
 					add_token_attribute(new_tree, tag_name, attr);
 
 					attr_tag_name_index = 0;
@@ -195,6 +195,7 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 				} else
 					start_attr_value = 1;
 
+				search_token++;
 				continue;
 			}
 
@@ -214,16 +215,43 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 	return search_token + 1;
 }
 
+int find_close_tag(FILE *file, char **curr_line, size_t buffer_size, int search_close) {
+	while((*curr_line)[search_close] != '>') {
+		if ((*curr_line)[search_close] == '\n') {
+			getline(curr_line, &buffer_size, file);
+
+			search_close = 0;
+		}
+
+		search_close++;
+	}
+
+	return search_close;
+}
+
 int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_size, int search_token) {
 
 	while(getline(&curr_line, &buffer_size, file) != -1) {
+		search_token = 0;
 		printf("get line %d: %s\n", search_token, curr_line);
 
 		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
 			if (curr_line[search_token] == '<') {
-				printf("searching tag %s\n", curr_line);
+				printf("looking at next tag? %s with curr parent: %s\n", curr_line, curr_tree->tag);
+
+				if (curr_line[search_token + 1] == '/') { // close tag
+					// return to parent tree instead
+
+					curr_tree = grab_token_parent(curr_tree);
+
+					search_token = find_close_tag(file, &curr_line, buffer_size, search_token) + 1;
+					continue;
+				}
 
 				search_token = read_tag(curr_tree, file, &curr_line, buffer_size, search_token);
+			
+				// update curr_tree to dive into the subtree
+				curr_tree = grab_token_children(curr_tree);
 			}
 
 			search_token++;
