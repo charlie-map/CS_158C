@@ -1,4 +1,4 @@
-<page>
+<page tag = "heyo">
 	<id>25</id>
 	<title>Random Information</title>
 	<text>I am random information you don't need</text>

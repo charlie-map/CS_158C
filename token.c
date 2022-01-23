@@ -6,6 +6,11 @@ typedef struct Token {
 	char *tag;
 	void *data; // for a singular type (like a char *)
 
+	int max_attr_tag, attr_tag_index;
+	char **attribute; // holds any attributes for this tag
+	// the attribute name is always an even position and
+	// the attribute itself is odd
+
 	int max_children, children_index;
 	struct Token **children; // for nest children tags
 
@@ -18,9 +23,13 @@ token_t *create_token(char *tag, void *data, token_t *parent) {
 	new_token->tag = tag;
 	new_token->data = data;
 
+	new_token->max_attr_tag = 8;
+	new_token->attr_tag_index = 0;
+	new_token->attribute = malloc(sizeof(char *) * new_token->max_attr_tag);
+
 	new_token->max_children = 8;
 	new_token->children_index = 0;
-	new_token->children = malloc(sizeof(void *) * new_token->max_children);
+	new_token->children = malloc(sizeof(token_t *) * new_token->max_children);
 
 	new_token->parent = parent;
 
@@ -29,6 +38,20 @@ token_t *create_token(char *tag, void *data, token_t *parent) {
 
 int add_token_data(token_t *token, void *data) {
 	token->data = data;
+
+	return 0;
+}
+
+int add_token_attribute(token_t *token, char *tag, char *attribute) {
+	token->attribute[token->attr_tag_index++] = tag;
+	token->attribute[token->attr_tag_index] = attribute;
+
+	// check for resize
+	if (token->attr_tag_index == token->max_attr_tag) {
+		token->max_attr_tag *= 2;
+
+		token->attribute = realloc(token->attribute, sizeof(char *) * token->max_attr_tag);
+	}
 
 	return 0;
 }
@@ -66,120 +89,81 @@ int main() {
 	return 0;
 }
 
+int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
+	*main_tag = malloc(sizeof(char) * 8);
+	int max_main_tag = 8, main_tag_index = 0;
+
+	while (curr_line[search_token] != '>' &&
+		   curr_line[search_token] != '\n' &&
+		   curr_line[search_token] != ' ') {
+
+		(*main_tag)[main_tag_index] = curr_line[search_token];
+
+		search_token++;
+		main_tag_index++;
+
+		if (main_tag_index == max_main_tag) {
+			max_main_tag *= 2;
+
+			*main_tag = realloc(*main_tag, sizeof(char) * max_main_tag);
+		}
+	}
+
+	return search_tag;
+}
+
+// builds a new tree and adds it as a child of parent_tree
+int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_size, int search_token) {
+	char *main_tag;
+	search_token = read_main_tag(&main_tag, *curr_line, search_token);
+
+	token_t *new_tree = create_token(main_tag, NULL, parent_tree);
+
+	char *attr_tag_name = malloc(sizeof(char) * 8);
+	int max_attr_tag_name = 8, attr_tag_name_index = 0;
+	char *attr_tag_value = malloc(sizeof(char) * 8);
+	int max_attr_tag_value = 8, attr_tag_value_index = 0;
+
+	while ((*curr_line)[search_token] != '>') {
+		if (curr_line[search_token] == '\n') {
+			search_token = 0;
+
+			getline(curr_line, &buffsize, file);
+		}
+
+
+
+		search_token++;
+	}
+
+	return search_token;
+}
+
+int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_size, int search_token) {
+
+	while(getline(&curr_line, &buffsize, file)) {
+
+		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
+			if (curr_line[search_token] == '<') {
+				printf("searching tag %s\n", curr_line);
+
+				search_token = read_tag(curr_tree, &curr_line, search_token);
+			}
+
+			search_token++;
+		}
+	}
+
+	return 0;
+}
+
 token_t *tokenize(char *filename) {
 	FILE *file = fopen(filename, "r");
 
 	token_t *curr_tree = create_token("root", NULL, NULL);
 
-	int reading_tag = 0; // check for if we are currently within a tag
-	int tag_type = 1; // if we are in the open or closed tag reading
-					  // 1 for open tag, 0 for closed tag
-
-	// layout for an arraylist to count up the semi_tag
-	int semi_tag_max = 8, semi_tag_curr = 0;
-	char *semi_tag = malloc(sizeof(char) * semi_tag_max);
-
-	// layout for an arraylist to count up the data within a tag (char *)
-	int inner_string_tag_max = 8, inner_string_tag_curr = 0;
-	char *inner_string_tag = malloc(sizeof(char) * inner_string_tag_max);
-	memset(inner_string_tag, '\0', inner_string_tag_max);
-
 	char *line_read = malloc(sizeof(char));
 	size_t buffsize = 0;
 
-	while(getline(&line_read, &buffsize, file)) {
-		printf("start reading: %s", line_read);
-		// search for tags and data
-		int search_line = 0;
-
-		while (line_read[search_line] != '\n' && line_read[search_line] != '\0') {
-			// find open and close tags
-			if (line_read[search_line] == '<') {
-				reading_tag = 1;
-
-				if (line_read[search_line + 1] == '/') {
-					search_line++;
-					tag_type = 0;
-
-					curr_tree = curr_tree->parent ? (token_t *) grab_token_parent(curr_tree) : curr_tree;
-
-					continue;
-				}
-
-				semi_tag_curr = 0;
-				memset(semi_tag, '\0', semi_tag_max);
-
-				tag_type = 1;
-			} else if (line_read[search_line] == '>') {
-
-				reading_tag = 0;
-
-				if (!tag_type) {
-					// when we are on the close tag, add whatever is
-					// in the inner_string_tag into the data
-					// for the curr_tree tag
-					// copy data to a new allocated string
-					// plus space for null terminator
-					if (strlen(inner_string_tag)) {
-						char *copy_data = malloc(sizeof(char) * strlen(inner_string_tag) + sizeof(char));
-						strcpy(copy_data, inner_string_tag);
-
-						add_token_data(curr_tree, copy_data);
-					}
-
-					inner_string_tag_curr = 0;
-					memset(inner_string_tag, '\0', inner_string_tag_max);
-				} else {
-					// otherwise take curr_tree (which is this nodes' parent)
-					// and add a new token child
-					// same as data, copy tag into a newly allocated string
-					char *copy_tag = malloc(sizeof(semi_tag));
-					strcpy(copy_tag, semi_tag);
-
-					token_t *new_token = create_token(copy_tag, NULL, curr_tree);
-
-					// add new_token as a child of parent
-					add_token_children(curr_tree, new_token);
-
-					// re add parent (since it's still part of this tree)
-					curr_tree = new_token;
-				}
-			} else {
-				if (reading_tag) {
-					semi_tag[semi_tag_curr] = line_read[search_line];
-
-					semi_tag_curr++;
-
-					if (semi_tag_curr == semi_tag_max) { // resize
-						semi_tag_max *= 2;
-
-						semi_tag = realloc(semi_tag, sizeof(char) * semi_tag_max);
-					}
-
-					semi_tag[semi_tag_curr] = '\0';
-				} else {
-					inner_string_tag[inner_string_tag_curr] = line_read[search_line];
-
-					inner_string_tag_curr++;
-
-					if (inner_string_tag_curr == inner_string_tag_max) { // resize
-						inner_string_tag_max *= 2;
-
-						inner_string_tag = realloc(inner_string_tag, sizeof(char) * inner_string_tag_max);
-					}
-
-					inner_string_tag[inner_string_tag_curr] = '\0';
-				}
-			}
-
-			search_line++;
-		}
-	}
-
-	free(line_read);
-
-	free(inner_string_tag);
-	free(semi_tag);
-
-	return curr_tree;
+	tokenizeMETA(file, curr_tree, line_read, buffsize, -1);
 }
