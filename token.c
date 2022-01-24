@@ -143,12 +143,13 @@ int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
 }
 
 // builds a new tree and adds it as a child of parent_tree
-int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_size, int search_token) {
+int read_tag(token_t *parent_tree, FILE *file, char **curr_line, int search_token) {
 	char *main_tag;
 	search_token = read_main_tag(&main_tag, *curr_line, search_token);
 
 	token_t *new_tree = create_token(main_tag, parent_tree);
 
+	size_t buffer_size = 0;
 	int read_tag = 1; // choose whether to add to attr_tag_name
 					  // or attr_tag_value: 1 to add to attr_tag_name
 					  // 0 to add to attr_tag_value
@@ -247,10 +248,12 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 	return search_token + 1;
 }
 
-int find_close_tag(FILE *file, char **curr_line, size_t buffer_size, int search_close) {
+int find_close_tag(FILE *file, char **curr_line, int search_close) {
+	size_t buffer_size = 0;
+
 	while((*curr_line)[search_close] != '>') {
 		if ((*curr_line)[search_close] == '\n') {
-			getline(curr_line, &buffer_size, file);
+			getdelim(curr_line, &buffer_size, 10, file);
 
 			search_close = 0;
 		}
@@ -261,9 +264,12 @@ int find_close_tag(FILE *file, char **curr_line, size_t buffer_size, int search_
 	return search_close;
 }
 
-int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_size, int search_token) {
+int tokenizeMETA(FILE *file, token_t *curr_tree) {
+	int search_token = 0;
+	char *curr_line = "";
+	size_t buffer_size = 0;
 
-	while(getline(&curr_line, &buffer_size, file) != -1) {
+	while(getdelim(&curr_line, &buffer_size, 10, file) != -1) {
 		search_token = 0;
 
 		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
@@ -274,11 +280,11 @@ int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_
 
 					curr_tree = grab_token_parent(curr_tree);
 
-					search_token = find_close_tag(file, &curr_line, buffer_size, search_token) + 1;
+					search_token = find_close_tag(file, &curr_line, search_token) + 1;
 					continue;
 				}
 
-				search_token = read_tag(curr_tree, file, &curr_line, buffer_size, search_token);
+				search_token = read_tag(curr_tree, file, &curr_line, search_token);
 			
 				// update curr_tree to dive into the subtree
 				curr_tree = grab_token_children(curr_tree);
@@ -291,6 +297,7 @@ int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_
 		}
 	}
 
+	free(curr_line);
 	return 0;
 }
 
@@ -301,12 +308,8 @@ token_t *tokenize(char *filename) {
 	strcpy(root_tag, "root");
 	token_t *curr_tree = create_token(root_tag, NULL);
 
-	char *line_read = malloc(sizeof(char));
-	size_t buffsize = 0;
+	tokenizeMETA(file, curr_tree);
 
-	tokenizeMETA(file, curr_tree, line_read, buffsize, 0);
-
-	free(line_read);
 	fclose(file);
 
 	return curr_tree;
