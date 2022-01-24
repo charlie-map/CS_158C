@@ -14,7 +14,9 @@ void *resize_arraylist(void *array, int *max_size, int current_index) {
 
 typedef struct Token {
 	char *tag;
-	void *data; // for a singular type (like a char *)
+
+	int data_index, max_data;
+	char *data; // for a singular type (like a char *)
 
 	int max_attr_tag, attr_tag_index;
 	char **attribute; // holds any attributes for this tag
@@ -27,11 +29,13 @@ typedef struct Token {
 	struct Token *parent;
 } token_t;
 
-token_t *create_token(char *tag, void *data, token_t *parent) {
+token_t *create_token(char *tag, token_t *parent) {
 	token_t *new_token = malloc(sizeof(token_t));
 
 	new_token->tag = tag;
-	new_token->data = data;
+	new_token->data = malloc(sizeof(char) * 8);
+	new_token->max_data = 8;
+	new_token->data_index = 0;
 
 	new_token->max_attr_tag = 8;
 	new_token->attr_tag_index = 0;
@@ -46,8 +50,12 @@ token_t *create_token(char *tag, void *data, token_t *parent) {
 	return new_token;
 }
 
-int add_token_data(token_t *token, void *data) {
-	token->data = data;
+int add_token_rolling_data(token_t *token, char data) {
+	token->data[token->data_index] = data;
+
+	token->data_index++;
+
+	token->data = resize_arraylist(token->data, &token->max_data, token->data_index);
 
 	return 0;
 }
@@ -86,8 +94,29 @@ token_t *grab_token_parent(token_t *curr_token) {
 
 token_t *tokenize(char *filename);
 
+int destroy_token(token_t *curr_token) {
+	free(curr_token->tag);
+	free(curr_token->data);
+
+	// free attributes
+	for (int free_attribute = 0; free_attribute < curr_token->attr_tag_index; free_attribute++)
+		free(curr_token->attribute[free_attribute]);
+	free(curr_token->attribute);
+
+	// free children
+	for (int free_child = 0; free_child < curr_token->children_index; free_child++)
+		destroy_token(curr_token->children[free_child]);
+	free(curr_token->children);
+
+	free(curr_token);
+
+	return 0;
+}
+
 int main() {
 	token_t *xml_tree = tokenize("miniXML.txt");
+
+	destroy_token(xml_tree);
 
 	return 0;
 }
@@ -118,7 +147,7 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 	char *main_tag;
 	search_token = read_main_tag(&main_tag, *curr_line, search_token);
 
-	token_t *new_tree = create_token(main_tag, NULL, parent_tree);
+	token_t *new_tree = create_token(main_tag, parent_tree);
 
 	int read_tag = 1; // choose whether to add to attr_tag_name
 					  // or attr_tag_value: 1 to add to attr_tag_name
@@ -211,6 +240,9 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, size_t buffer_s
 		search_token++;
 	}
 
+	free(attr_tag_name);
+	free(attr_tag_value);
+
 	add_token_children(parent_tree, new_tree);
 	return search_token + 1;
 }
@@ -233,11 +265,9 @@ int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_
 
 	while(getline(&curr_line, &buffer_size, file) != -1) {
 		search_token = 0;
-		printf("get line %d: %s\n", search_token, curr_line);
 
 		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
 			if (curr_line[search_token] == '<') {
-				printf("looking at next tag? %s with curr parent: %s\n", curr_line, curr_tree->tag);
 
 				if (curr_line[search_token + 1] == '/') { // close tag
 					// return to parent tree instead
@@ -254,6 +284,9 @@ int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_
 				curr_tree = grab_token_children(curr_tree);
 			}
 
+			// otherwise add character to the curr_tree
+			add_token_rolling_data(curr_tree, curr_line[search_token]);
+
 			search_token++;
 		}
 	}
@@ -264,12 +297,17 @@ int tokenizeMETA(FILE *file, token_t *curr_tree, char *curr_line, size_t buffer_
 token_t *tokenize(char *filename) {
 	FILE *file = fopen(filename, "r");
 
-	token_t *curr_tree = create_token("root", NULL, NULL);
+	char *root_tag = malloc(sizeof(char) * 5);
+	strcpy(root_tag, "root");
+	token_t *curr_tree = create_token(root_tag, NULL);
 
 	char *line_read = malloc(sizeof(char));
 	size_t buffsize = 0;
 
 	tokenizeMETA(file, curr_tree, line_read, buffsize, 0);
+
+	free(line_read);
+	fclose(file);
 
 	return curr_tree;
 }
