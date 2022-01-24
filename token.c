@@ -12,7 +12,7 @@ void *resize_arraylist(void *array, int *max_size, int current_index) {
 	return array;
 }
 
-typedef struct Token {
+struct Token {
 	char *tag;
 
 	int data_index, max_data;
@@ -27,7 +27,7 @@ typedef struct Token {
 	struct Token **children; // for nest children tags
 
 	struct Token *parent;
-} token_t;
+};
 
 token_t *create_token(char *tag, token_t *parent) {
 	token_t *new_token = malloc(sizeof(token_t));
@@ -109,14 +109,6 @@ int destroy_token(token_t *curr_token) {
 	free(curr_token->children);
 
 	free(curr_token);
-
-	return 0;
-}
-
-int main() {
-	token_t *xml_tree = tokenize("miniXML.txt");
-
-	destroy_token(xml_tree);
 
 	return 0;
 }
