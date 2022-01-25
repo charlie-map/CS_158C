@@ -46,6 +46,9 @@ int main() {
 		printf("check tag: %s -- %d\n", tag[check_tag], strlen(tag[check_tag]));
 	}
 
+	free(total_tags);
+	free(tag);
+
 	destroy_token(tree_root);
 
 	return 0;
