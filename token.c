@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "token.h"
+
 void *resize_arraylist(void *array, int *max_size, int current_index) {
 	if (current_index == *max_size) {
 		*max_size *= 2;
@@ -56,6 +58,7 @@ int add_token_rolling_data(token_t *token, char data) {
 	token->data_index++;
 
 	token->data = resize_arraylist(token->data, &token->max_data, token->data_index);
+	token->data[token->data_index] = '\0';
 
 	return 0;
 }
@@ -81,6 +84,10 @@ int add_token_children(token_t *token_parent, token_t *child) {
 	return 0;
 }
 
+token_t **token_children(token_t *parent) {
+	return parent->children;
+}
+
 token_t *grab_token_children(token_t *parent) {
 	if (parent->children_index == 0)
 		return NULL;
@@ -91,8 +98,6 @@ token_t *grab_token_children(token_t *parent) {
 token_t *grab_token_parent(token_t *curr_token) {
 	return curr_token->parent;
 }
-
-token_t *tokenize(char *filename);
 
 int destroy_token(token_t *curr_token) {
 	free(curr_token->tag);
@@ -113,6 +118,38 @@ int destroy_token(token_t *curr_token) {
 	return 0;
 }
 
+int token_tagMETA(token_t *search_token, char *search_tag, char ***found_tag, int *max_tag, int *tag_index) {
+	// check if current tree position has correct tag
+	if (strcmp(search_token->tag, search_tag) == 0) {
+		(*found_tag)[(*tag_index)++] = search_token->data;
+
+		*found_tag = (char **) resize_arraylist(*found_tag, max_tag, *tag_index);
+	}
+
+	// check children
+	for (int check_child = 0; check_child < search_token->children_index; check_child++) {
+		token_tagMETA(search_token->children[check_child], search_tag, found_tag, max_tag, tag_index);
+	}
+
+	return 0;
+}
+
+char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag) {
+	// setup char ** array
+	*max_tag = 8;
+	char **found_tag = malloc(sizeof(char *) * *max_tag);
+	int *tag_index = (int *) malloc(sizeof(int));
+	*tag_index = 0;
+
+	token_tagMETA(search_token, tag_name, &found_tag, max_tag, tag_index);
+
+	// move value into max tag (which becomes the index for the return value)
+	*max_tag = *tag_index;
+	free(tag_index);
+
+	return found_tag;
+}
+
 int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
 	*main_tag = malloc(sizeof(char) * 8);
 	int max_main_tag = 8, main_tag_index = 0;
@@ -129,6 +166,8 @@ int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
 		main_tag_index++;
 
 		*main_tag = resize_arraylist(*main_tag, &max_main_tag, main_tag_index);
+
+		(*main_tag)[main_tag_index] = '\0';
 	}
 
 	return search_tag;
@@ -195,9 +234,9 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, int search_toke
 			}
 
 			attr_tag_name[attr_tag_name_index++] = (*curr_line)[search_token];
-			attr_tag_name[attr_tag_name_index] = '\0';
 
 			attr_tag_name = resize_arraylist(attr_tag_name, &max_attr_tag_name, attr_tag_name_index);
+			attr_tag_name[attr_tag_name_index] = '\0';
 		} else {
 			if ((*curr_line)[search_token] == '"' || (*curr_line)[search_token] == '\'') {
 				if (start_attr_value) {
@@ -225,9 +264,9 @@ int read_tag(token_t *parent_tree, FILE *file, char **curr_line, int search_toke
 				continue;
 
 			attr_tag_value[attr_tag_value_index++] = (*curr_line)[search_token];
-			attr_tag_value[attr_tag_value_index] = '\0';
 
 			attr_tag_value = resize_arraylist(attr_tag_value, &max_attr_tag_value, attr_tag_value_index);
+			attr_tag_value[attr_tag_value_index] = '\0';
 		}
 
 		search_token++;
@@ -258,8 +297,9 @@ int find_close_tag(FILE *file, char **curr_line, int search_close) {
 
 int tokenizeMETA(FILE *file, token_t *curr_tree) {
 	int search_token = 0;
-	char *curr_line = "";
-	size_t buffer_size = 0;
+
+	size_t buffer_size = sizeof(char) * 123;
+	char *curr_line = malloc(buffer_size);
 
 	while(getdelim(&curr_line, &buffer_size, 10, file) != -1) {
 		search_token = 0;
