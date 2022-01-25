@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "token.h"
+#include "hashmap.h"
 
 /*
 	serialize will try to search through the void * to pull out informaiton
@@ -26,14 +27,33 @@
 	- "o": defines the order the output file held within "i" should have
 		- "w: i" is an example where "w" is the current word and "i" (in the local context)
 			is the "id"
+		- currently the above is the only parameter option (defaults to this behavior)
 
 	- an example of the above could be:
 		"ito", "invertedIndex.txt", "titleIndex.txt", "w: i"
 */
-// int serializeMETA(void *tree, char *param, ...) {
-// 	// setup any initial requirements
-// 	va_list 
-// }
+int serializeMETA(void *tree, char *param, ...) {
+	// setup any initial requirements
+	va_list additional_arg;
+	va_start(additional_arg, param);
+
+	FILE *index_fp = NULL;
+	FILE *title_fp = NULL;
+
+	char *format = "text/ : [id]"; // default
+
+	for (int check_param = 0; param[check_param]; check_param++) {
+		if (param[check_param] == 'i') {
+			index_fp = fopen(va_arg(additional_arg, char *), "w");
+		} else if (param[check_param] == 't') {
+			title_fp = fopen(va_arg(additional_arg, char *), "w");
+		} else if (param[check_param] == 'o') {
+			format = va_arg(additional_arg, char *);
+		}
+	}
+
+	// format reader to prep for the next step
+}
 
 int main() {
 	token_t *tree_root = tokenize("miniXML.txt");
