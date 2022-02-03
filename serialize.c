@@ -6,6 +6,8 @@
 #include "token.h"
 #include "hashmap.h"
 
+// create index structure
+
 /*
 	goes through a char * to create an array of char * that are split
 	based on the delimeter character. If the string was:

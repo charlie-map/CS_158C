@@ -154,6 +154,8 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 			curr_res_pos++;
 		}
 
+		free(str_len);
+
 		arr[arr_index++] = str;
 		arr = (char **) resize_array(arr, max_len, arr_index, sizeof(char *));
 	}
@@ -165,7 +167,7 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 }
 
 // takes request url and will build the full url:
-char *get(int socket, char *request_url, int *url_length) {
+char *send_req(int socket, char *request_url, int *url_length, char *type, ...) {
 	// build the request into the header:
 	char *header = create_header(request_url, url_length);
 
@@ -257,7 +259,7 @@ int main() {
 	int *url_length = malloc(sizeof(int));
 	char *new_url = build_request("/pull_page_names", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 	int *response_max_len = malloc(sizeof(int));
-	char *response = get(sock, new_url, url_length);
+	char *response = send_req(sock, new_url, url_length, "GET");
 
 	printf("All check: %s\n", response);
 
@@ -265,11 +267,16 @@ int main() {
 
 	for (int check_res = 0; check_res < *response_max_len; check_res++) {
 		printf("check response: %s\n", arr[check_res]);
+
+		free(arr[check_res]);
 	}
 
 	free(url_length);
 	free(new_url);
+	free(response_max_len);
 	free(response);
+
+	free(arr);
 
 	freeaddrinfo(servinfo);
 
