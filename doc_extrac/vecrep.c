@@ -23,11 +23,11 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
-void *resize_array(void *arr, int *max_len, int curr_index) {
+void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
 		*max_len *= 2;
 
-		arr = realloc(arr, sizeof(arr[0]) * *max_len);
+		arr = realloc(arr, singleton_size * *max_len);
 	}
 	
 	return arr;
@@ -71,14 +71,14 @@ char *build_request(char *request_url, int *req_length, char *query_param, ...) 
 			char *arg_value = va_arg(param_pull, char *);
 			int arg_len = strlen(arg_value);
 
-			full_request = resize_array(full_request, req_length, req_index + arg_len);
+			full_request = resize_array(full_request, req_length, req_index + arg_len, sizeof(char));
 			strcpy(full_request + (sizeof(char) * req_index), arg_value);
 
 			req_index += arg_len;
 		} else
 			full_request[req_index++] = query_param[check_param];
 
-		full_request = resize_array(full_request, req_length, req_index);
+		full_request = resize_array(full_request, req_length, req_index, sizeof(char));
 
 		full_request[req_index] = '\0';
 	}
@@ -141,22 +141,21 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 				continue;
 			}
 
-			if (res[curr_res_pos] == '"' && res[curr_res_pos] == ((char *) stack_peek(abstract_depth))[0])
+			if (res[curr_res_pos] == '"' && stack_size(abstract_depth) && res[curr_res_pos] == ((char *) stack_peek(abstract_depth))[0])
 				stack_pop(abstract_depth);
 			else if (res[curr_res_pos] == '"')
 				stack_push(abstract_depth, "\"");
+			else {
+				str[str_index++] = res[curr_res_pos];
 
-			str[str_index++] = res[curr_res_pos];
+				str = (char *) resize_array(str, str_len, str_index, sizeof(char));
+				str[str_index] = '\0';
+			}
 			curr_res_pos++;
-
-			str = resize_array(str, str_len, str_index);
-			str[str_index] = '\0';
 		}
 
-		free(str_len);
-
 		arr[arr_index++] = str;
-		arr = resize_array(arr, max_len, arr_index);
+		arr = (char **) resize_array(arr, max_len, arr_index, sizeof(char *));
 	}
 
 	stack_destroy(abstract_depth);
@@ -257,9 +256,16 @@ int main() {
 	// send get request to remote server
 	int *url_length = malloc(sizeof(int));
 	char *new_url = build_request("/pull_page_names", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	int *response_max_len = malloc(sizeof(int));
 	char *response = get(sock, new_url, url_length);
 
-	printf("response: %s\n", response);
+	printf("All check: %s\n", response);
+
+	char **arr = handle_array(response, response_max_len, 0);
+
+	for (int check_res = 0; check_res < *response_max_len; check_res++) {
+		printf("check response: %s\n", arr[check_res]);
+	}
 
 	free(url_length);
 	free(new_url);

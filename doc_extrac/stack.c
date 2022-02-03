@@ -40,7 +40,7 @@ int stack_push(stack_tv2 *stack, void *payload) {
 }
 
 void *stack_peek(stack_tv2 *stack) {
-	return stack->stack_head;
+	return stack->stack_head->payload;
 }
 
 void *stack_pop(stack_tv2 *stack) {
