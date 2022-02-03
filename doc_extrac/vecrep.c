@@ -16,8 +16,8 @@
 
 #include "stack.h"
 
-#define HOST "localhost"
-#define PORT "9876"
+#define HOST "cutewiki.charlie.city"
+#define PORT "8822"
 #define MAXLINE 4096
 
 #define REQ_NAME "permission_data_pull"
@@ -98,12 +98,18 @@ char *create_header(char *request_url, int *url_length) {
 	strcat(build_host + (sizeof(char) * (host_length + 1)), PORT);
 
 	// calculate header length
-	*url_length = 24 + *url_length + strlen(build_host);
+	*url_length = 47 + *url_length + strlen(build_host);
 	char *header = malloc(sizeof(char) * *url_length);
-	
-	sprintf(header, "GET %s HTTP/1.1\nHost: %s\n\n\n", request_url, build_host);
+	char *copy_header = malloc(sizeof(char) * (*url_length + 1));
+
+	sprintf(copy_header, "GET %s HTTP/1.1\nHost: %s\nContent-Type: text/plain\n\n", request_url, build_host);
+
+	for (int copy_value = 0; copy_value < *url_length; copy_value++) {
+		header[copy_value] = copy_header[copy_value];
+	}
 
 	free(build_host);
+	free(copy_header);
 
 	return header;
 }
@@ -160,7 +166,7 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 }
 
 // takes request url and will build the full url:
-char **get(int socket, char *request_url, int *url_length, int *response_length, char ** (*handle_response)(char *, int *, int)) {
+char *get(int socket, char *request_url, int *url_length) {
 	// build the request into the header:
 	char *header = create_header(request_url, url_length);
 
@@ -177,6 +183,7 @@ char **get(int socket, char *request_url, int *url_length, int *response_length,
 
 	int bytes_recv = -1;
 	char *buffer = malloc(sizeof(char) * MAXLINE);
+	memset(buffer, '\0', sizeof(char) * MAXLINE);
 	int buffer_len = MAXLINE;
 
 	while (bytes_recv = recv(socket, buffer, buffer_len, 0)) {
@@ -186,22 +193,23 @@ char **get(int socket, char *request_url, int *url_length, int *response_length,
 		break;
 	}
 
-	printf("%s\n", buffer);
-
 	// find start of data in buffer:
+	int buffer_data_len = strlen(buffer);
 	int curr_res_pos;
-	for (curr_res_pos = 0; curr_res_pos < 400; curr_res_pos++) {
+	for (curr_res_pos = 0; curr_res_pos < buffer_data_len; curr_res_pos++) {
 		if ((int) buffer[curr_res_pos] == 10 && (int) buffer[curr_res_pos + 2] == 10) {
 			curr_res_pos += 3;
 			break;
 		}
 	}
 
-	char **return_value = handle_array(buffer, response_length, curr_res_pos);
+	// create string that holds return value:
+	char *return_string = malloc(sizeof(char) * (buffer_data_len - curr_res_pos + 1));
+	strcpy(return_string, buffer + sizeof(char) * curr_res_pos);
 
 	free(buffer);
 
-	return return_value;
+	return return_string;
 }
 
 int main() {
@@ -224,27 +232,37 @@ int main() {
 		exit(1);
 	}
 
-	sock = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+	// loop through all the results and connect to the first we can
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sock = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+            perror("client: socket");
+            continue;
+        }
 
-	if ((status = connect(sock, servinfo->ai_addr, servinfo->ai_addrlen)) != 0) {
-		fprintf(stderr, "connect error: %s\n", gai_strerror(status));
-		exit(1);
-	}
+        if (connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sock);
+            perror("client: connect");
+            continue;
+        }
+
+        break;
+    }
+
+    if (p == NULL) {
+        fprintf(stderr, "client: failed to connect\n");
+        return 2;
+    }
 
 	// send get request to remote server
 	int *url_length = malloc(sizeof(int));
-	char *new_url = build_request("/test", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
-	int *response_length = malloc(sizeof(int));
-	char **response = get(sock, new_url, url_length, response_length, handle_array);
+	char *new_url = build_request("/pull_page_names", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	char *response = get(sock, new_url, url_length);
 
-	for (int check_response = 0; check_response < *response_length; check_response++) {
-		printf("test: %s\n", response[check_response]);
-		free(response[check_response]);
-	}
+	printf("response: %s\n", response);
 
 	free(url_length);
 	free(new_url);
-	free(response_length);
 	free(response);
 
 	freeaddrinfo(servinfo);
