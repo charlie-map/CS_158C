@@ -103,13 +103,15 @@ char *create_header(char *request_url, int *url_length) {
 	
 	sprintf(header, "GET %s HTTP/1.1\nHost: %s\n\n\n", request_url, build_host);
 
+	free(build_host);
+
 	return header;
 }
 
-char **handle_array(char *res, int curr_res_pos) {
-	int *max_len = malloc(sizeof(int)), arr_index = 0;
+char **handle_array(char *res, int *max_len, int curr_res_pos) {
+	int arr_index = 0;
 	*max_len = 8;
-	char **arr = malloc(sizeof(char) * *max_len);
+	char **arr = malloc(sizeof(char *) * *max_len);
 
 	int max_res_length = strlen(res);
 
@@ -119,24 +121,30 @@ char **handle_array(char *res, int curr_res_pos) {
 	// ["10, 2", 6]
 	stack_tv2 *abstract_depth = stack_create();
 
-	printf("test %d to %d\n", curr_res_pos, max_res_length);
-
 	for (curr_res_pos; curr_res_pos < max_res_length; curr_res_pos++) {
 		int *str_len = malloc(sizeof(int)), str_index = 0;
 		*str_len = 8;
 		char *str = malloc(sizeof(char) * *str_len);
 
+		str[str_index] = '\0';
+
 		// seek until ',' or ']' AND stack is empty
 		while ((res[curr_res_pos] != ',' && res[curr_res_pos] != ']') || stack_size(abstract_depth)) {
+			if (res[curr_res_pos] == '[' && !stack_size(abstract_depth)) {
+				curr_res_pos++;
+				continue;
+			}
+
 			if (res[curr_res_pos] == '"' && res[curr_res_pos] == ((char *) stack_peek(abstract_depth))[0])
 				stack_pop(abstract_depth);
-			else if (res[curr_res_pos] == '"');
+			else if (res[curr_res_pos] == '"')
 				stack_push(abstract_depth, "\"");
 
 			str[str_index++] = res[curr_res_pos];
 			curr_res_pos++;
 
 			str = resize_array(str, str_len, str_index);
+			str[str_index] = '\0';
 		}
 
 		free(str_len);
@@ -145,15 +153,14 @@ char **handle_array(char *res, int curr_res_pos) {
 		arr = resize_array(arr, max_len, arr_index);
 	}
 
-	for (int check = 0; check < arr_index; check++) {
-		printf("Test: %s\n", arr[check]);
-	}
+	stack_destroy(abstract_depth);
+	*max_len = arr_index;
 
 	return arr;
 }
 
 // takes request url and will build the full url:
-char **get(int socket, char *request_url, int *url_length, char ** (*handle_response)(char *, int)) {
+char **get(int socket, char *request_url, int *url_length, int *response_length, char ** (*handle_response)(char *, int *, int)) {
 	// build the request into the header:
 	char *header = create_header(request_url, url_length);
 
@@ -166,6 +173,8 @@ char **get(int socket, char *request_url, int *url_length, char ** (*handle_resp
 		}
 	}
 
+	free(header);
+
 	int bytes_recv = -1;
 	char *buffer = malloc(sizeof(char) * MAXLINE);
 	int buffer_len = MAXLINE;
@@ -177,16 +186,22 @@ char **get(int socket, char *request_url, int *url_length, char ** (*handle_resp
 		break;
 	}
 
+	printf("%s\n", buffer);
+
 	// find start of data in buffer:
 	int curr_res_pos;
-	for (curr_res_pos = 0; curr_res_pos < buffer_len; curr_res_pos++) {
-		if (buffer[curr_res_pos] == '\n' && buffer[curr_res_pos + 2] == '\n')
+	for (curr_res_pos = 0; curr_res_pos < 400; curr_res_pos++) {
+		if ((int) buffer[curr_res_pos] == 10 && (int) buffer[curr_res_pos + 2] == 10) {
+			curr_res_pos += 3;
 			break;
+		}
 	}
 
-	char **test = handle_array(buffer, curr_res_pos);
+	char **return_value = handle_array(buffer, response_length, curr_res_pos);
 
-	return test;
+	free(buffer);
+
+	return return_value;
 }
 
 int main() {
@@ -218,14 +233,21 @@ int main() {
 
 	// send get request to remote server
 	int *url_length = malloc(sizeof(int));
-	char *new_url = build_request("/test", url_length, ""); //build_request("/test", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
-	printf("Get full length %d request: %s\n", *url_length, new_url);
-	get(sock, new_url, url_length, handle_array);
+	char *new_url = build_request("/test", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	int *response_length = malloc(sizeof(int));
+	char **response = get(sock, new_url, url_length, response_length, handle_array);
 
-	freeaddrinfo(servinfo);
+	for (int check_response = 0; check_response < *response_length; check_response++) {
+		printf("test: %s\n", response[check_response]);
+		free(response[check_response]);
+	}
 
 	free(url_length);
 	free(new_url);
+	free(response_length);
+	free(response);
+
+	freeaddrinfo(servinfo);
 
 	return 0;
 }

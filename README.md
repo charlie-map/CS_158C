@@ -44,7 +44,7 @@ This searches through XML (Extended Markup Language) to recursively generate a t
   char **returned_tags = token_get_tag_data(new_tree, "id", max_length);
   ```
   - At which point, each value in `returned_tags` can be evaluated using a loop from `0` to `*max_length`.
-  - *Note:* Both `max_length` and `returned_tags` requires a single free such as the following:
+  - *Note:* Both `max_length` and `returned_tags` require a single free such as the following:
   ```C
   free(max_length);
   free(returned_tags);
