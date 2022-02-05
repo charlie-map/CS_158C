@@ -88,7 +88,7 @@ char *build_request(char *request_url, int *req_length, char *query_param, ...) 
 	return full_request;
 }
 
-char *create_header(char *request_url, int *url_length) {
+char *create_header(char *request_url, int *url_length, char *post_data) {
 	int host_length = strlen(HOST);
 	char *build_host = malloc(sizeof(char) * (host_length + strlen(PORT) + 2));
 	memset(build_host, '\0', host_length + strlen(PORT) + 2);
@@ -98,11 +98,14 @@ char *create_header(char *request_url, int *url_length) {
 	strcat(build_host + (sizeof(char) * (host_length + 1)), PORT);
 
 	// calculate header length
-	*url_length = 47 + *url_length + strlen(build_host);
+	int post_data_len = post_data ? strlen(post_data) : 0;
+	*url_length = 35 + (post_data ? 37 + post_data_len : 31) + *url_length + strlen(build_host) + (post_data ? strlen(post_data) : 0);
 	char *header = malloc(sizeof(char) * *url_length);
 	char *copy_header = malloc(sizeof(char) * (*url_length + 1));
 
-	sprintf(copy_header, "GET %s HTTP/1.1\nHost: %s\nContent-Type: text/plain\n\n", request_url, build_host);
+	sprintf(copy_header, "%s %s HTTP/1.1\nHost: %s\nContent-Type: %s\nContent-Length: %d\n\n\n%s",
+		post_data ? "POST" : "GET", request_url, build_host, (post_data ?
+		"application/x-www-form-urlencoded" : "text/plain"), post_data ? post_data : "", post_data_len);
 
 	for (int copy_value = 0; copy_value < *url_length; copy_value++) {
 		header[copy_value] = copy_header[copy_value];
@@ -168,8 +171,18 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 
 // takes request url and will build the full url:
 char *send_req(int socket, char *request_url, int *url_length, char *type, ...) {
+	char *data = NULL;
+	if (strcmp(type, "POST") == 0) { // look for next param
+		va_list post_data;
+		va_start(post_data, type);
+
+		data = va_arg(post_data, char *);
+	}
+
 	// build the request into the header:
-	char *header = create_header(request_url, url_length);
+	char *header = create_header(request_url, url_length, data);
+
+	printf("HEADER %d: %s\n", *url_length, header);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
@@ -234,26 +247,26 @@ int main() {
 	}
 
 	// loop through all the results and connect to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sock = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("client: socket");
-            continue;
-        }
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sock = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
+		}
 
-        if (connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sock);
-            perror("client: connect");
-            continue;
-        }
+		if (connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sock);
+			perror("client: connect");
+			continue;
+		}
 
-        break;
-    }
+		break;
+	}
 
-    if (p == NULL) {
-        fprintf(stderr, "client: failed to connect\n");
-        return 2;
-    }
+	if (p == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		return 2;
+	}
 
 	// send get request to remote server
 	int *url_length = malloc(sizeof(int));
@@ -261,18 +274,28 @@ int main() {
 	int *response_max_len = malloc(sizeof(int));
 	char *response = send_req(sock, new_url, url_length, "GET");
 
-	printf("All check: %s\n", response);
+	free(url_length);
+	free(new_url);
 
 	char **arr = handle_array(response, response_max_len, 0);
 
 	for (int check_res = 0; check_res < *response_max_len; check_res++) {
 		printf("check response: %s\n", arr[check_res]);
 
+		int *new_res_url_len = malloc(sizeof(int));
+		char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+		int *res_len = malloc(sizeof(int));
+		char *curate_data = malloc(sizeof(char) * (11 + strlen(arr[check_res])));
+		strcpy(curate_data, "unique_id=");
+		strcat(curate_data, arr[check_res]);
+
+		char *res = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
+
+		printf("check_response: %s\n", res);
+
 		free(arr[check_res]);
 	}
 
-	free(url_length);
-	free(new_url);
 	free(response_max_len);
 	free(response);
 
