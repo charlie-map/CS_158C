@@ -95,17 +95,24 @@ char *create_header(char *request_url, int *url_length, char *post_data) {
 
 	strcpy(build_host, HOST);
 	build_host[host_length] = ':';
-	strcat(build_host + (sizeof(char) * (host_length + 1)), PORT);
+	strcat(build_host, PORT);
 
 	// calculate header length
 	int post_data_len = post_data ? strlen(post_data) : 0;
-	*url_length = 35 + (post_data ? 37 + post_data_len : 31) + *url_length + strlen(build_host) + (post_data ? strlen(post_data) : 0);
+
+	// calculate how many digits the post_data_len is:
+	int content_number = 1, content_number_calculator = post_data_len;
+	if (post_data_len >= 100) { content_number += 2; content_number_calculator /= 100; }
+	if (post_data_len >= 10) { content_number += 1; content_number_calculator /= 10; }
+
+	*url_length = 69 + (post_data ? 24 + post_data_len : 0) + *url_length + strlen(build_host) + content_number;
+
 	char *header = malloc(sizeof(char) * *url_length);
 	char *copy_header = malloc(sizeof(char) * (*url_length + 1));
 
-	sprintf(copy_header, "%s %s HTTP/1.1\nHost: %s\nContent-Type: %s\nContent-Length: %d\n\n\n%s",
+	sprintf(copy_header, "%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
 		post_data ? "POST" : "GET", request_url, build_host, (post_data ?
-		"application/x-www-form-urlencoded" : "text/plain"), post_data ? post_data : "", post_data_len);
+		"application/x-www-form-urlencoded" : "text/plain"), post_data_len, post_data ? post_data : "");
 
 	for (int copy_value = 0; copy_value < *url_length; copy_value++) {
 		header[copy_value] = copy_header[copy_value];
@@ -182,7 +189,7 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 	// build the request into the header:
 	char *header = create_header(request_url, url_length, data);
 
-	printf("HEADER %d: %s\n", *url_length, header);
+	printf("HEADER %d (versus: %d): %s\n", *url_length, strlen(header), header);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
@@ -196,9 +203,9 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 	free(header);
 
 	int bytes_recv = -1;
-	char *buffer = malloc(sizeof(char) * MAXLINE);
-	memset(buffer, '\0', sizeof(char) * MAXLINE);
-	int buffer_len = MAXLINE;
+	size_t buffer_len = sizeof(char) * MAXLINE;
+	char *buffer = malloc(buffer_len);
+	memset(buffer, '\0', buffer_len);
 
 	while (bytes_recv = recv(socket, buffer, buffer_len, 0)) {
 		if (bytes_recv == -1)
@@ -206,6 +213,8 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 
 		break;
 	}
+
+	printf("get buffer %d\n\n", bytes_recv);
 
 	// find start of data in buffer:
 	int buffer_data_len = strlen(buffer);
@@ -280,18 +289,18 @@ int main() {
 	char **arr = handle_array(response, response_max_len, 0);
 
 	for (int check_res = 0; check_res < *response_max_len; check_res++) {
-		printf("check response: %s\n", arr[check_res]);
-
 		int *new_res_url_len = malloc(sizeof(int));
 		char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 		int *res_len = malloc(sizeof(int));
 		char *curate_data = malloc(sizeof(char) * (11 + strlen(arr[check_res])));
 		strcpy(curate_data, "unique_id=");
-		strcat(curate_data, arr[check_res]);
+		strcpy(curate_data + (10 * sizeof(char)), arr[check_res]);
+
+		printf("content: %s\n", curate_data);
 
 		char *res = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
 
-		printf("check_response: %s\n", res);
+		//printf("check_response: %s\n", res);
 
 		free(arr[check_res]);
 	}
