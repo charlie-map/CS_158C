@@ -193,7 +193,6 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 }
 
 hashmap *read_headers(char *header_str, int *header_end) {
-	printf("start: %s", header_str);
 	int past_lines = 0;
 
 	hashmap *header_map = make__hashmap(0, NULL, destroyCharKey);
@@ -204,13 +203,9 @@ hashmap *read_headers(char *header_str, int *header_end) {
 
 	past_lines += 1;
 
-	printf("found next: %c\n", header_str[past_lines]);
-
 	// while the newline doesn't start with a newline
 	// (double newline is end of header)
 	while ((int) header_str[past_lines] != 10) {
-		printf("curr level: %c\n", header_str[past_lines]);
-
 		int *head_max = malloc(sizeof(int)), head_index = 0;
 		*head_max = 8;
 		char *head_tag = malloc(sizeof(char) * *head_max);
@@ -238,7 +233,8 @@ hashmap *read_headers(char *header_str, int *header_end) {
 			attr_tag[attr_index] = '\0';
 		}
 
-		past_lines += attr_index + 2;
+		// check for a carraige return (\r). This means the newline character is one further along
+		past_lines += attr_index + ((int) header_str[past_lines + attr_index + 2] == 13 ? 3 : 2);
 
 		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
 	}
@@ -281,30 +277,34 @@ res *send_req(int socket, char *request_url, int *url_length, char *type, ...) {
 	// read header
 	int *header_end = malloc(sizeof(int));
 	hashmap *headers = read_headers(header_read, header_end);
-	return NULL;
 	int content_length = atoi(get__hashmap(headers, "Content-Length"));
 
 	printf("headers: %s\n", header_read);
-	printf("get content length: %d (start char? %c) with header end: %d\n", content_length, header_read[*header_end], *header_end);
+	printf("get content length: %d (start chars? %c + %c + %c) with header end: %d\n", content_length, header_read[*header_end], header_read[*header_end + 1], header_read[*header_end + 2], *header_end);
 
 	size_t full_req_len = sizeof(char) * content_length;
-	char *buffer = malloc(full_req_len + 1);
+	char *buffer = malloc(full_req_len + sizeof(char));
+	memset(buffer, '\0', full_req_len + sizeof(char));
 	for (int copy_after_head = *header_end; copy_after_head * sizeof(char) < curr_bytes_recv; copy_after_head++) {
 		buffer[copy_after_head - *header_end] = header_read[copy_after_head];
 	}
 
-	curr_bytes_recv -= *header_end;
+	int buffer_bytes = curr_bytes_recv - *header_end * sizeof(char);
 	free(header_read);
 	free(header_end);
 
-	printf("read rest: %d\n", curr_bytes_recv);
+	printf("read rest: %d\n", buffer_bytes);
 
-	while (curr_bytes_recv < full_req_len) {
-		curr_bytes_recv += recv(socket, buffer + curr_bytes_recv, full_req_len, 0);
+	while (buffer_bytes < full_req_len) {
+		int new_bytes = recv(socket, buffer + buffer_bytes, full_req_len, 0);
 
-		if (curr_bytes_recv == -1) {
+		if (new_bytes == -1) {
 			continue;
 		}
+
+		buffer_bytes += new_bytes;
+
+		printf("add to bytes: %d\n", buffer_bytes);
 	}
 
 	buffer[full_req_len] = '\0';
@@ -362,21 +362,28 @@ int main() {
 	int *response_max_len = malloc(sizeof(int));
 	res *response = send_req(sock, new_url, url_length, "GET");
 
+	if (!response) // uh oh!
+		return 1;
+
 	free(url_length);
 	free(new_url);
 
+	printf("response: %s\n", response->body);
+
 	char **arr = handle_array(response->body, response_max_len, 0);
 
-	for (int check_res = 0; check_res < 5; check_res++) {
+	for (int check_res = 1; check_res < 3; check_res++) {
 		int *new_res_url_len = malloc(sizeof(int));
 		char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
-		
+
 		char *curate_data = malloc(sizeof(char) * (11 + strlen(arr[check_res])));
 		strcpy(curate_data, "unique_id=");
 		strcpy(curate_data + (10 * sizeof(char)), arr[check_res]);
 
 		res *xml_body = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
-		continue;
+		
+		printf("get body: %s\n", (char *) get__hashmap(xml_body->headers, "Content-Length"));
+
 		free(new_res_url_len);
 		free(res_url);
 		res_destroy(xml_body);
