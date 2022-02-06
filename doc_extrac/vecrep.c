@@ -107,19 +107,19 @@ char *create_header(char *request_url, int *url_length, char *post_data) {
 
 	*url_length = 69 + (post_data ? 24 + post_data_len : 0) + *url_length + strlen(build_host) + content_number;
 
-	char *header = malloc(sizeof(char) * *url_length);
-	char *copy_header = malloc(sizeof(char) * (*url_length + 1));
+	char *header = malloc(sizeof(char) * (*url_length + 1));
+	//char *copy_header = malloc(sizeof(char) * (*url_length + 1));
 
-	sprintf(copy_header, "%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
+	sprintf(header, "%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
 		post_data ? "POST" : "GET", request_url, build_host, (post_data ?
 		"application/x-www-form-urlencoded" : "text/plain"), post_data_len, post_data ? post_data : "");
 
-	for (int copy_value = 0; copy_value < *url_length; copy_value++) {
-		header[copy_value] = copy_header[copy_value];
-	}
+	// for (int copy_value = 0; copy_value < *url_length; copy_value++) {
+	// 	header[copy_value] = copy_header[copy_value];
+	// }
 
 	free(build_host);
-	free(copy_header);
+	//free(copy_header);
 
 	return header;
 }
@@ -214,7 +214,7 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 		break;
 	}
 
-	printf("get buffer %d\n\n", bytes_recv);
+	printf("get buffer %s\n\n", buffer);
 
 	// find start of data in buffer:
 	int buffer_data_len = strlen(buffer);
@@ -278,37 +278,52 @@ int main() {
 	}
 
 	// send get request to remote server
-	int *url_length = malloc(sizeof(int));
-	char *new_url = build_request("/pull_page_names", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
-	int *response_max_len = malloc(sizeof(int));
-	char *response = send_req(sock, new_url, url_length, "GET");
+	// int *url_length4 = malloc(sizeof(int));
+	// char *new_url4 = build_request("/pull_page_names", url_length4, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	// char *response4 = send_req(sock, new_url4, url_length4, "GET");
 
-	free(url_length);
-	free(new_url);
+	// free(url_length);
+	// free(new_url);
 
-	char **arr = handle_array(response, response_max_len, 0);
+	// char **arr = handle_array(response, response_max_len, 0);
+	int *new_res_url_len3 = malloc(sizeof(int));
+	char *res_url3 = build_request("/pull_data", new_res_url_len3, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	char *curate_data3 = malloc(sizeof(char) * (11 + strlen("Q18545")));
+	strcpy(curate_data3, "unique_id=");
+	strcpy(curate_data3 + (10 * sizeof(char)), "Q18545");
 
-	for (int check_res = 0; check_res < *response_max_len; check_res++) {
-		int *new_res_url_len = malloc(sizeof(int));
-		char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
-		int *res_len = malloc(sizeof(int));
-		char *curate_data = malloc(sizeof(char) * (11 + strlen(arr[check_res])));
-		strcpy(curate_data, "unique_id=");
-		strcpy(curate_data + (10 * sizeof(char)), arr[check_res]);
+	printf("content: %s\n", curate_data3);
 
-		printf("content: %s\n", curate_data);
+	char *res3 = send_req(sock, res_url3, new_res_url_len3, "POST", curate_data3);
 
-		char *res = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
 
-		//printf("check_response: %s\n", res);
+	// for (int check_res = 0; check_res < *response_max_len; check_res++) {
+	int *new_res_url_len = malloc(sizeof(int));
+	char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	int *res_len = malloc(sizeof(int));
+	char *curate_data = malloc(sizeof(char) * (11 + strlen("Q29")));
+	strcpy(curate_data, "unique_id=");
+	strcpy(curate_data + (10 * sizeof(char)), "Q29");
 
-		free(arr[check_res]);
-	}
+	printf("content: %s\n", curate_data);
 
-	free(response_max_len);
-	free(response);
+	char *res = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
+	// 	//printf("check_response: %s\n", res);
 
-	free(arr);
+	// 	free(arr[check_res]);
+	// }
+
+	int *new_res_url_len2 = malloc(sizeof(int));
+	char *res_url2 = build_request("/pull_data", new_res_url_len2, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	char *curate_data2 = malloc(sizeof(char) * (11 + strlen("Q46")));
+	strcpy(curate_data2, "unique_id=");
+	strcpy(curate_data2 + (10 * sizeof(char)), "Q46");
+
+	printf("content: %s\n", curate_data2);
+
+	char *res2 = send_req(sock, res_url2, new_res_url_len2, "POST", curate_data2);
+
+	//free(arr);
 
 	freeaddrinfo(servinfo);
 
