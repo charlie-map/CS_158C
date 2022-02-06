@@ -24,6 +24,27 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
+typedef struct Response {
+	hashmap *headers;
+	char *body;
+} res;
+
+res *res_create(hashmap *head, char *bo) {
+	res *new_res = malloc(sizeof(res));
+
+	new_res->headers = head;
+	new_res->body = bo;
+
+	return new_res;
+}
+
+int res_destroy(res *re) {
+	deepdestroy__hashmap(re->headers);
+	free(re->body);
+
+	return 0;
+}
+
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
 		*max_len *= 2;
@@ -109,18 +130,12 @@ char *create_header(char *request_url, int *url_length, char *post_data) {
 	*url_length = 69 + (post_data ? 24 + post_data_len : 0) + *url_length + strlen(build_host) + content_number;
 
 	char *header = malloc(sizeof(char) * (*url_length + 1));
-	//char *copy_header = malloc(sizeof(char) * (*url_length + 1));
 
 	sprintf(header, "%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
 		post_data ? "POST" : "GET", request_url, build_host, (post_data ?
 		"application/x-www-form-urlencoded" : "text/plain"), post_data_len, post_data ? post_data : "");
 
-	// for (int copy_value = 0; copy_value < *url_length; copy_value++) {
-	// 	header[copy_value] = copy_header[copy_value];
-	// }
-
 	free(build_host);
-	//free(copy_header);
 
 	return header;
 }
@@ -178,20 +193,23 @@ char **handle_array(char *res, int *max_len, int curr_res_pos) {
 }
 
 hashmap *read_headers(char *header_str, int *header_end) {
+	printf("start: %s", header_str);
 	int past_lines = 0;
 
 	hashmap *header_map = make__hashmap(0, NULL, destroyCharKey);
 
 	// jump past HTTP: status line
-	while ((int) *(header_str + past_lines * sizeof(char)) != 10)
+	while ((int) header_str[past_lines] != 10)
 		past_lines++;
 
 	past_lines += 1;
 
+	printf("found next: %c\n", header_str[past_lines]);
+
 	// while the newline doesn't start with a newline
 	// (double newline is end of header)
-
-	while ((int) header_str[past_lines] != 10 && (int) header_str[past_lines + 1] != 10) {
+	while ((int) header_str[past_lines] != 10) {
+		printf("curr level: %c\n", header_str[past_lines]);
 
 		int *head_max = malloc(sizeof(int)), head_index = 0;
 		*head_max = 8;
@@ -204,7 +222,7 @@ hashmap *read_headers(char *header_str, int *header_end) {
 		// head head tag
 		while ((int) header_str[past_lines + head_index] != 58) {
 
-			head_tag[head_index++] = *(header_str + (past_lines + head_index) * sizeof(char));
+			head_tag[head_index++] = header_str[past_lines + head_index];
 
 			head_tag = resize_array(head_tag, head_max, head_index, sizeof(char));
 			head_tag[head_index] = '\0';
@@ -213,24 +231,24 @@ hashmap *read_headers(char *header_str, int *header_end) {
 		past_lines += head_index + 2;
 
 		// read attr tag
-		while ((int) header_str[past_lines + attr_index] != 10) {
+		while ((int) header_str[past_lines + attr_index + 1] != 10) {
 			attr_tag[attr_index++] = header_str[past_lines + attr_index];
 
 			attr_tag = resize_array(attr_tag, attr_max, attr_index, sizeof(char));
 			attr_tag[attr_index] = '\0';
 		}
 
-		past_lines += attr_index + 1;
+		past_lines += attr_index + 2;
 
 		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
 	}
 
-	*header_end = past_lines + ((int) header_str[past_lines + 1] == 10 ? 2 : 1);
+	*header_end = past_lines + 1;
 	return header_map;
 }
 
 // takes request url and will build the full url:
-char *send_req(int socket, char *request_url, int *url_length, char *type, ...) {
+res *send_req(int socket, char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
 	if (strcmp(type, "POST") == 0) { // look for next param
 		va_list post_data;
@@ -241,8 +259,6 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 
 	// build the request into the header:
 	char *header = create_header(request_url, url_length, data);
-
-	printf("HEADER %d (versus: %d): %s\n", *url_length, strlen(header), header);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
@@ -265,9 +281,11 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 	// read header
 	int *header_end = malloc(sizeof(int));
 	hashmap *headers = read_headers(header_read, header_end);
+	return NULL;
 	int content_length = atoi(get__hashmap(headers, "Content-Length"));
 
-	printf("get content length: %d with header end: %d\n", content_length, *header_end);
+	printf("headers: %s\n", header_read);
+	printf("get content length: %d (start char? %c) with header end: %d\n", content_length, header_read[*header_end], *header_end);
 
 	size_t full_req_len = sizeof(char) * content_length;
 	char *buffer = malloc(full_req_len + 1);
@@ -275,7 +293,9 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 		buffer[copy_after_head - *header_end] = header_read[copy_after_head];
 	}
 
+	curr_bytes_recv -= *header_end;
 	free(header_read);
+	free(header_end);
 
 	printf("read rest: %d\n", curr_bytes_recv);
 
@@ -288,7 +308,9 @@ char *send_req(int socket, char *request_url, int *url_length, char *type, ...) 
 	}
 
 	buffer[full_req_len] = '\0';
-	return buffer;
+
+	// create response structure
+	return res_create(headers, buffer);
 }
 
 int main() {
@@ -338,13 +360,14 @@ int main() {
 	char *new_url = build_request("/pull_page_names", url_length, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 	
 	int *response_max_len = malloc(sizeof(int));
-	char *response = send_req(sock, new_url, url_length, "GET");
+	res *response = send_req(sock, new_url, url_length, "GET");
 
-	printf("get response: %s\n", response);
+	free(url_length);
+	free(new_url);
 
-	char **arr = handle_array(response, response_max_len, 0);
+	char **arr = handle_array(response->body, response_max_len, 0);
 
-	for (int check_res = 0; check_res < 1; check_res++) {
+	for (int check_res = 0; check_res < 5; check_res++) {
 		int *new_res_url_len = malloc(sizeof(int));
 		char *res_url = build_request("/pull_data", new_res_url_len, "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 		
@@ -352,11 +375,17 @@ int main() {
 		strcpy(curate_data, "unique_id=");
 		strcpy(curate_data + (10 * sizeof(char)), arr[check_res]);
 
-		char *res = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
-		printf("check_response: %s\n", res);
+		res *xml_body = send_req(sock, res_url, new_res_url_len, "POST", curate_data);
+		continue;
+		free(new_res_url_len);
+		free(res_url);
+		res_destroy(xml_body);
 
 	 	free(arr[check_res]);
 	}
+
+	free(response_max_len);
+	res_destroy(response);
 
 	free(arr);
 
