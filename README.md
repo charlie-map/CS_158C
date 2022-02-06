@@ -12,7 +12,7 @@ Working through implementations of many of the projects in CS 158 at Brown Unive
 # Tokenize Document
 This searches through XML (Extended Markup Language) to recursively generate a tree (similar to the Document Object Model). The main functions within the tokenize process (which is laid in in `token.h`) are:
 - `token_t *tokenize(char *filename);`
-  - Most of the tree creatioin occurs within this function here. This reads technically character by character. However, when important tags within the markup language are seen (such as an open carrot `<`), reads the tag from inside the other close carrot (`>`) and then _recursively_ (this uses a stack under the hood, but a similar concept) repeats the process on sub tags of that branch.
+  - Most of the tree creation occurs within this function here. This reads technically character by character. However, when important tags within the markup language are seen (such as an open carrot `<`), reads the tag from inside the other close carrot (`>`) and then _recursively_ (this uses a stack under the hood, but a similar concept) repeats the process on sub tags of that branch.
   - This takes a `char *` which holds the file name of the XML page, which could look like:
   ```XML
   <page>
