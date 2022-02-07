@@ -52,7 +52,7 @@ int main() {
 
 		// parse the wiki data and write to the bag of words
 		// res_body(wiki_page)
-		int finish = word_bag(index_writer, title_writer, stopword_trie, tokenize('s', "<page>\n<id>25</id>\n<title>Random Information</title>\n<text>I am random information you don't need, or need it, you don't?</text>\n</page>"));
+		int finish = word_bag(index_writer, title_writer, stopword_trie, tokenize('s', "<page>\n<id>25</id>\n<title>Random Information</title>\n<text>I am random information you don't need, or need it, you don't? More Information</text>\n</page>"));
 
 		if (finish < 0) {
 			printf("\nWRITE ERR\n");

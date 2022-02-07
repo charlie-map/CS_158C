@@ -129,17 +129,42 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		}
 
 		hashmap_freq = malloc(sizeof(int));
-		*hashmap_freq = 0;
+		*hashmap_freq = 1;
 
-		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareIntKey, destroy_hashmap_val);
+		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 	}
 
 	int *key_len = malloc(sizeof(int));
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
 
-	for (int test_keys = 0; test_keys < *key_len; test_keys++) {
-		printf("key: %s\n", (char *) keys[test_keys]);
+	// setup index file:
+	fputs(ID, index_fp);
+	fputs(": ", index_fp);
+
+	// loop through keys and input word:freq pairs
+	for (int write_key = 0; write_key < *key_len; write_key++) {
+		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key]);
+
+		char *key_freq_str = malloc(sizeof(char) * 11);
+		memset(key_freq_str, '\0', sizeof(char) * 11);
+
+		sprintf(key_freq_str, "%d", *(int *) key_freq);
+
+		fputs(keys[write_key], index_fp);
+		fputs(":", index_fp);
+		fputs(key_freq_str, index_fp);
+		fputs(" ", index_fp);
+
+		free(key_freq_str);
+		free(keys[write_key]);
 	}
+
+	fputs("\n", index_fp);
+
+	free(keys);
+	free(key_len);
+
+	deepdestroy__hashmap(word_freq_hash);
 
 	return 0;
 }
