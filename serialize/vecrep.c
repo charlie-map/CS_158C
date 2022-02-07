@@ -47,19 +47,22 @@ int main() {
 	char **array_body = handle_array(res_body(response), array_length);
 
 	printf("\nCurrent wiki IDs:\n");
-	for (int print_array = 0; print_array < 1; print_array++) {
+	for (int print_array = 0; print_array < *array_length; print_array++) {
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
 		// parse the wiki data and write to the bag of words
 		// res_body(wiki_page)
-		int finish = word_bag(index_writer, title_writer, stopword_trie, tokenize('s', "<page>\n<id>25</id>\n<title>Random Information</title>\n<text>I am random information you don't need, or need it, you don't? More Information</text>\n</page>"));
+		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
+		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 
 		if (finish < 0) {
 			printf("\nWRITE ERR\n");
 			return 1;
 		}
 
+		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);
+
 		free(array_body[print_array]);
 	}
 

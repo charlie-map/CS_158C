@@ -455,8 +455,10 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 		}
 	}
 
+	free(buffer_size);
 	free(buffer_reader[0]);
 	free(buffer_reader);
+
 	return 0;
 }
 

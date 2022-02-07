@@ -438,10 +438,11 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 		// now choose for body ('b') or query ('q')
 		if (param[check_param + 1] == 'q') {
 			new_url = build_url(sub_url, url_length, query_structure, tag_attrs);
-			free(tag_attrs);
 		} else {
 			new_data = build_url("", data_length, query_structure, tag_attrs);
 		}
+
+		free(tag_attrs);
 	}
 
 	free(data_length);

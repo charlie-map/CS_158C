@@ -64,6 +64,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len) {
 
 	*arr_len = arr_index + 1;
 
+	free(max_curr_sub_word);
+
 	return arr;
 }
 
@@ -105,7 +107,11 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	// grab full page data
 	int *page_data_len = malloc(sizeof(int)), *word_number_max = malloc(sizeof(int));
-	char **full_page_data = split_string(token_read_all_data(grab_token_by_tag(full_page, "text"), page_data_len), ' ', word_number_max);
+	char *token_page_data = token_read_all_data(grab_token_by_tag(full_page, "text"), page_data_len);
+	char **full_page_data = split_string(token_page_data, ' ', word_number_max);
+
+	free(page_data_len);
+	free(token_page_data);
 
 	// create hashmap representation:
 	hashmap *word_freq_hash = make__hashmap(0, NULL, destroy_hashmap_val);
@@ -117,13 +123,16 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			// insert into hashmap at word with frequency = 0
 	for (int add_hash = 0; add_hash < *word_number_max; add_hash++) {
 		// check if word is in the stopword trie:
-		if (trie_search(stopword_trie, full_page_data[add_hash]))
+		if (trie_search(stopword_trie, full_page_data[add_hash])) {
+			free(full_page_data[add_hash]);
 			continue; // skip
+		}
 
 		// get from word_freq_hash:
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash]);
 
 		if (hashmap_freq) {
+			free(full_page_data[add_hash]);
 			(*hashmap_freq)++;
 			continue;
 		}
@@ -133,6 +142,8 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 	}
+
+	free(word_number_max);
 
 	int *key_len = malloc(sizeof(int));
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
@@ -161,10 +172,13 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	fputs("\n", index_fp);
 
+	free(ID);
+
 	free(keys);
 	free(key_len);
 
 	deepdestroy__hashmap(word_freq_hash);
+	free(full_page_data);
 
 	return 0;
 }
