@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "trie.h"
+#include "token.h"
 #include "request.h"
 #include "hashmap.h"
+#include "serialize.h"
 
 #define HOST "cutewiki.charlie.city"
 #define PORT "8822"
@@ -10,9 +13,29 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
+trie_t *fill_stopwords(char *stop_word_file) {
+	trie_t *trie = trie_create("-pc");
+
+	FILE *stop_fp = fopen(stop_word_file, "r");
+
+	size_t word_len = 16 * sizeof(char);
+	char *word = malloc(word_len);
+	while (getline(&word, &word_len, stop_fp) != -1)
+		trie_insert(trie, word);
+
+	free(word);
+	fclose(stop_fp);
+
+	return trie;
+}
+
 int main() {
+	// create stopword structure
+	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
+
 	// create write stream:
-	FILE *writer = fopen("docbags.txt", "w");
+	FILE *index_writer = fopen("docbags.txt", "w");
+	FILE *title_writer = fopen("title.txt", "w");
 	socket_t *sock_data = get_socket(HOST, PORT);
 
 	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
@@ -24,10 +47,12 @@ int main() {
 	char **array_body = handle_array(res_body(response), array_length);
 
 	printf("\nCurrent wiki IDs:\n");
-	for (int print_array = 0; print_array < *array_length; print_array++) {
+	for (int print_array = 0; print_array < 1; print_array++) {
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
-		int finish = fputs(res_body(wiki_page), writer);
+		// parse the wiki data and write to the bag of words
+		// res_body(wiki_page)
+		int finish = word_bag(index_writer, title_writer, stopword_trie, tokenize('s', "<page>\n<id>25</id>\n<title>Random Information</title>\n<text>I am random information you don't need, or need it, you don't?</text>\n</page>"));
 
 		if (finish < 0) {
 			printf("\nWRITE ERR\n");
@@ -44,6 +69,7 @@ int main() {
 	res_destroy(response);
 
 	destroy_socket(sock_data);
+	trie_destroy(stopword_trie);
 
 	return 0;
 }

@@ -99,6 +99,55 @@ token_t *grab_token_parent(token_t *curr_token) {
 	return curr_token->parent;
 }
 
+token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
+	// search for first occurence of token with tag name == tag_name
+	// if it doesn't exists, return NULL
+	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+		// compare tag:
+		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0)
+			return start_token->children[check_children];
+	}
+
+	// otherwise check children
+	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
+		token_t *check_children_token = grab_token_by_tag(start_token->children[bfs_children], tag_name);
+
+		if (check_children_token)
+			return check_children_token;
+	}
+
+	return NULL;
+}
+
+int grab_tokens_by_tag_helper(token_t **specific_token_builder, int *spec_token_max, int spec_token_index, token_t *start_token, char *tag_name) {
+	// check current tokens children:
+	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0) {
+			specific_token_builder[spec_token_index++] = start_token->children[check_children];
+
+			specific_token_builder = (token_t **) resize_arraylist(specific_token_builder, spec_token_max, spec_token_index);
+		}
+
+		// recur
+		spec_token_index = grab_tokens_by_tag_helper(specific_token_builder, spec_token_max, spec_token_index, start_token->children[check_children], tag_name);
+	}
+
+	return spec_token_index;
+}
+
+// This is not fast!!
+token_t **grab_tokens_by_tag(token_t *start_token, char *tags_name, int *spec_token_max) {
+	int spec_token_index = 0;
+	*spec_token_max = 8;
+	token_t **specific_token_builder = malloc(sizeof(token_t *) * *spec_token_max);
+
+	spec_token_index = grab_tokens_by_tag_helper(specific_token_builder, spec_token_max, spec_token_index, start_token, tags_name);
+
+	*spec_token_max = spec_token_index;
+
+	return specific_token_builder;
+}
+
 int destroy_token(token_t *curr_token) {
 	free(curr_token->tag);
 	free(curr_token->data);
@@ -148,6 +197,43 @@ char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag) {
 	free(tag_index);
 
 	return found_tag;
+}
+
+int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index) {
+	// search through each child token and add to full_data:
+	for (int add_from_child = 0; add_from_child < search_token->children_index; add_from_child++) {
+		// calculate length of the data:
+		int data_len = search_token->children[add_from_child]->data_index;
+
+		data_index += data_len;
+		*full_data = resize_arraylist(*full_data, data_max, data_index);
+
+		strcpy(*full_data, search_token->children[add_from_child]->data);
+
+		// get children
+		data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index);
+	}
+
+	return data_index;
+}
+
+// go through the entire sub tree and create a char ** of all data values
+char *token_read_all_data(token_t *search_token, int *data_max) {
+	int data_index = search_token->data_index;
+	*data_max = data_index * 2;
+	char **full_data = malloc(sizeof(char *));
+	*full_data = malloc(sizeof(char) * *data_max);
+
+	// read data from curr token:
+	strcpy(*full_data, search_token->data);
+
+	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index);
+
+	*data_max = data_index;
+
+	char *pull_data = *full_data;
+	free(full_data);
+	return pull_data;
 }
 
 int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
@@ -295,14 +381,54 @@ int find_close_tag(FILE *file, char **curr_line, int search_close) {
 	return search_close;
 }
 
-int tokenizeMETA(FILE *file, token_t *curr_tree) {
+int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read) {
+	if (fp)
+		return getdelim(curr_line, buffer_size, 10, fp);
+
+	// otherwise search through str_read for a newline
+	int str_read_index = -1;
+
+	while (*str_read && (int) *str_read != 10) {
+		(*curr_line)[str_read_index + 1] = *str_read;
+
+		str_read += sizeof(char);
+		str_read_index++;
+
+		// check for resize
+		if ((str_read_index + 2) * sizeof(char) == *buffer_size) {
+			// increase
+			*buffer_size *= 2;
+			*curr_line = realloc(*curr_line, *buffer_size);
+		}
+
+		(*curr_line)[str_read_index + 1] = '\0';
+	}
+
+	if (str_read_index == -1)
+		return str_read_index;
+
+	(*curr_line)[str_read_index + 1] = '\n';
+	(*curr_line)[str_read_index + 2] = '\0';
+
+	return str_read_index + 2;
+}
+
+int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 	int search_token = 0;
 
-	size_t buffer_size = sizeof(char) * 123;
-	char *curr_line = malloc(buffer_size);
+	size_t *buffer_size = malloc(sizeof(size_t));
+	*buffer_size = sizeof(char) * 123;
+	char **buffer_reader = malloc(sizeof(char *));
+	*buffer_reader = malloc(*buffer_size);
 
-	while(getdelim(&curr_line, &buffer_size, 10, file) != -1) {
+	int read_len = 0;
+
+	while((read_len = read_newline(buffer_reader, buffer_size, file, str_read)) != -1) {
+		// move str_read forward
+		str_read += read_len * sizeof(char);
+
 		search_token = 0;
+		char *curr_line = *buffer_reader;
 
 		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
 			if (curr_line[search_token] == '<') {
@@ -329,20 +455,30 @@ int tokenizeMETA(FILE *file, token_t *curr_tree) {
 		}
 	}
 
-	free(curr_line);
+	free(buffer_reader[0]);
+	free(buffer_reader);
 	return 0;
 }
 
-token_t *tokenize(char *filename) {
-	FILE *file = fopen(filename, "r");
+/*
+	reader_type chooses what kind of reading is to be done:
+	'f' for file reading
+	's' for char * reading
+*/
+token_t *tokenize(char reader_type, char *filename) {
+	FILE *file = NULL;
+
+	if (reader_type == 'f')
+		file = fopen(filename, "r");
 
 	char *root_tag = malloc(sizeof(char) * 5);
 	strcpy(root_tag, "root");
 	token_t *curr_tree = create_token(root_tag, NULL);
 
-	tokenizeMETA(file, curr_tree);
+	tokenizeMETA(file, filename, curr_tree);
 
-	fclose(file);
+	if (file)
+		fclose(file);
 
 	return curr_tree;
 }

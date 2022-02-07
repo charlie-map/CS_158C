@@ -100,7 +100,6 @@ char *build_url(char *request_url, int *req_length, char *query_param, char **at
 
 		if (query_param[check_param] == '$') {
 			// read from arg list
-			printf("read data: %s\n", attr_values[curr_attr_pos]);
 			char *arg_value = attr_values[curr_attr_pos];
 			int arg_len = strlen(arg_value);
 
