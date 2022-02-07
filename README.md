@@ -63,6 +63,21 @@ This searches through XML (Extended Markup Language) to recursively generate a t
   - Recursively frees the entire tree previously created
 
 # Serialize Token
+The serialize process will write out to files in some form. Currently, there is one function type that can be used:
+- Word bag:
+```C
+int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page);
+```
+
+This will write to an index file (`index_fp`) in the format:
+```
+id: word:frequency word:frequency word:frequency etc.
+```
+and for the title index (`title_fp`) in the format:
+```
+id: title
+```
+- Other ideas for serialization? Add an issue to this repository.
 
 # Deserialize Index
 #### _Coming Soon_
