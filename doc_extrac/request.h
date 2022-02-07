@@ -1,7 +1,12 @@
 #ifndef __SOCKET_L__
 #define __SOCKET_L__
 
+#include "hashmap.h"
+
 typedef struct Response res;
+char *res_body(res *re);
+int res_body_len(res *re);
+hashmap *res_headers(res *re);
 int res_destroy(res *re);
 
 typedef struct SocketData {

@@ -15,7 +15,6 @@
 #include <netdb.h>
 
 #include "stack.h"
-#include "hashmap.h"
 #include "request.h"
 
 #define MAXLINE 4096
@@ -23,20 +22,36 @@
 struct Response {
 	hashmap *headers;
 	char *body;
+	int body_len;
 };
 
-res *res_create(hashmap *head, char *bo) {
+res *res_create(hashmap *head, char *bo, int bo_len) {
 	res *new_res = malloc(sizeof(res));
 
 	new_res->headers = head;
 	new_res->body = bo;
+	new_res->body_len = bo_len;
 
 	return new_res;
+}
+
+char *res_body(res *re) {
+	return re->body;
+}
+
+int res_body_len(res *re) {
+	return re->body_len;
+}
+
+hashmap *res_headers(res *re) {
+	return re->headers;
 }
 
 int res_destroy(res *re) {
 	deepdestroy__hashmap(re->headers);
 	free(re->body);
+
+	free(re);
 
 	return 0;
 }
@@ -85,6 +100,7 @@ char *build_url(char *request_url, int *req_length, char *query_param, char **at
 
 		if (query_param[check_param] == '$') {
 			// read from arg list
+			printf("read data: %s\n", attr_values[curr_attr_pos]);
 			char *arg_value = attr_values[curr_attr_pos];
 			int arg_len = strlen(arg_value);
 
@@ -149,7 +165,7 @@ char **handle_array(char *res, int *max_len) {
 	// ["10, 2", 6]
 	stack_tv2 *abstract_depth = stack_create();
 
-	for (int curr_res_pos; curr_res_pos < max_res_length; curr_res_pos++) {
+	for (int curr_res_pos = 0; curr_res_pos < max_res_length; curr_res_pos++) {
 		int *str_len = malloc(sizeof(int)), str_index = 0;
 		*str_len = 8;
 		char *str = malloc(sizeof(char) * *str_len);
@@ -233,6 +249,9 @@ hashmap *read_headers(char *header_str, int *header_end) {
 		past_lines += attr_index + ((int) header_str[past_lines + attr_index + 2] == 13 ? 3 : 2);
 
 		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
+
+		free(head_max);
+		free(attr_max);
 	}
 
 	*header_end = past_lines + 1;
@@ -275,9 +294,6 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	hashmap *headers = read_headers(header_read, header_end);
 	int content_length = atoi(get__hashmap(headers, "Content-Length"));
 
-	printf("headers: %s\n", header_read);
-	printf("get content length: %d (start chars? %c + %c + %c) with header end: %d\n", content_length, header_read[*header_end], header_read[*header_end + 1], header_read[*header_end + 2], *header_end);
-
 	size_t full_req_len = sizeof(char) * content_length;
 	char *buffer = malloc(full_req_len + sizeof(char));
 	memset(buffer, '\0', full_req_len + sizeof(char));
@@ -289,8 +305,6 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	free(header_read);
 	free(header_end);
 
-	printf("read rest: %d\n", buffer_bytes);
-
 	while (buffer_bytes < full_req_len) {
 		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
 
@@ -299,14 +313,12 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 		}
 
 		buffer_bytes += new_bytes;
-
-		printf("add to bytes: %d\n", buffer_bytes);
 	}
 
 	buffer[full_req_len] = '\0';
 
 	// create response structure
-	return res_create(headers, buffer);
+	return res_create(headers, buffer, full_req_len + 1);
 }
 
 socket_t *get_socket(char *HOST, char *PORT) {
@@ -407,7 +419,7 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 		if (param[check_param] != '-')
 			continue;
 
-		if (param[check_param + 1] != 'q' || param[check_param + 1] != 'b')
+		if (param[check_param + 1] != 'q' && param[check_param + 1] != 'b')
 			continue;
 
 		// grab the immediately next parameter which shows the structure of the 
@@ -435,7 +447,17 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 
 	free(data_length);
 
+	if (*url_length == 0)
+		return NULL;
+
 	// if GET, sending data doesn't matter
 	res *response = send_req_helper(sock, new_url, url_length, type, new_data);
+
+	free(new_url);
+	free(url_length);
+
+	if (new_data)
+		free(new_data);
+
 	return response;
 }
