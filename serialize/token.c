@@ -348,22 +348,22 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 }
 
 int find_end_comment(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_token) {
-	printf("\nCOMMENT %d:\n", search_token);
+
 	while (1) {
 		if (search_token > 1 && ((*curr_line)[search_token - 2] == '-' && (*curr_line)[search_token - 1] == '-' && (*curr_line)[search_token] == '>'))
 			break;
 
-		printf("%c", (*curr_line)[search_token]);
 		if ((*curr_line)[search_token] == '\n') {
 			search_token = 0;
 
+			str_read += (search_token + 1) * sizeof(char);
 			read_newline(curr_line, buffer_size, file, str_read);
+
+			continue;
 		}
 
 		search_token++;
 	}
-
-	printf("finish %d\n", search_token);
 
 	return search_token;
 }
@@ -522,7 +522,6 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 					curr_tree = grab_token_children(curr_tree);
 				else {
 					search_token *= -1;
-					return 0;
 				}
 
 				continue;

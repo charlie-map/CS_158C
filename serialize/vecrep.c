@@ -18,6 +18,11 @@ trie_t *fill_stopwords(char *stop_word_file) {
 
 	FILE *stop_fp = fopen(stop_word_file, "r");
 
+	if (!stop_fp) {
+		printf("Error with loading stopword from file: %s\n", stop_word_file);
+		exit(1);
+	}
+
 	size_t word_len = 16 * sizeof(char);
 	char *word = malloc(word_len);
 	while (getline(&word, &word_len, stop_fp) != -1)
@@ -54,12 +59,12 @@ int main() {
 		// res_body(wiki_page)
 		fputs(res_body(wiki_page), index_writer);
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
-		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
+		// int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 
-		if (finish < 0) {
-			printf("\nWRITE ERR\n");
-			return 1;
-		}
+		// if (finish < 0) {
+		// 	printf("\nWRITE ERR\n");
+		// 	return 1;
+		// }
 
 		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);
