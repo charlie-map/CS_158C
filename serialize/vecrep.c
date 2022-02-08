@@ -47,11 +47,12 @@ int main() {
 	char **array_body = handle_array(res_body(response), array_length);
 
 	printf("\nCurrent wiki IDs:\n");
-	for (int print_array = 0; print_array < *array_length; print_array++) {
+	for (int print_array = 0; print_array < 1; print_array++) {
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
 		// parse the wiki data and write to the bag of words
 		// res_body(wiki_page)
+		fputs(res_body(wiki_page), index_writer);
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
 		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 

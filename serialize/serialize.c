@@ -107,7 +107,9 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	// grab full page data
 	int *page_data_len = malloc(sizeof(int)), *word_number_max = malloc(sizeof(int));
-	char *token_page_data = token_read_all_data(grab_token_by_tag(full_page, "text"), page_data_len);
+	token_t *page_token = grab_token_by_tag(full_page, "text");
+	char *token_page_data = token_read_all_data(page_token, page_data_len);
+	printf("get page_data: %s\n", token_page_data);
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max);
 
 	free(page_data_len);
@@ -122,6 +124,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		// if it isn't:
 			// insert into hashmap at word with frequency = 0
 	for (int add_hash = 0; add_hash < *word_number_max; add_hash++) {
+		printf("grab & read: %s\n", full_page_data[add_hash]);
 		// check if word is in the stopword trie:
 		if (trie_search(stopword_trie, full_page_data[add_hash])) {
 			free(full_page_data[add_hash]);
