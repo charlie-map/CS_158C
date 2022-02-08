@@ -36,6 +36,7 @@ token_t *create_token(char *tag, token_t *parent) {
 
 	new_token->tag = tag;
 	new_token->data = malloc(sizeof(char) * 8);
+	memset(new_token->data, '\0', sizeof(char) * 8);
 	new_token->max_data = malloc(sizeof(int));
 	*new_token->max_data = 8;
 	new_token->data_index = 0;
@@ -100,7 +101,6 @@ token_t *grab_token_children(token_t *parent) {
 	if (parent->children_index == 0)
 		return NULL;
 
-	printf("get at: %s\n", (parent->children[parent->children_index - 1])->tag);
 	return parent->children[parent->children_index - 1];
 }
 
@@ -166,6 +166,10 @@ int destroy_token(token_t *curr_token) {
 		free(curr_token->attribute[free_attribute]);
 	free(curr_token->attribute);
 
+	free(curr_token->max_data);
+	free(curr_token->max_attr_tag);
+	free(curr_token->max_children);
+
 	// free children
 	for (int free_child = 0; free_child < curr_token->children_index; free_child++)
 		destroy_token(curr_token->children[free_child]);
@@ -214,10 +218,14 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 		// calculate length of the data:
 		int data_len = search_token->children[add_from_child]->data_index;
 
-		data_index += data_len;
-		*full_data = resize_arraylist(*full_data, data_max, data_index, sizeof(char));
+		data_index += data_len + 1;
+		while (data_index > *data_max) {
+			*data_max *= 2;
+			*full_data = realloc(*full_data, sizeof(char) * *data_max);
+		}
 
-		strcpy(*full_data, search_token->children[add_from_child]->data);
+		strcat(*full_data, search_token->children[add_from_child]->data);
+		strcat(*full_data, " ");
 
 		// get children
 		data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index);
@@ -236,7 +244,10 @@ char *token_read_all_data(token_t *search_token, int *data_max) {
 	// read data from curr token:
 	strcpy(*full_data, search_token->data);
 
-	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index);
+	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index) + 1;
+
+	*full_data = realloc(*full_data, sizeof(char) * data_index);
+	strcat(*full_data, "\0");
 
 	*data_max = data_index;
 
@@ -266,47 +277,6 @@ int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
 	}
 
 	return search_tag;
-}
-
-int find_close_tag(FILE *file, char **curr_line, int search_close) {
-	size_t buffer_size = 0;
-
-	while((*curr_line)[search_close] != '>') {
-		if ((*curr_line)[search_close] == '\n') {
-			getdelim(curr_line, &buffer_size, 10, file);
-
-			search_close = 0;
-		}
-
-		search_close++;
-	}
-
-	return search_close;
-}
-
-char *read_close_tag(FILE *file, char **curr_line, int search_close) {
-	size_t buffer_size = 0;
-	int *max_close_tag = malloc(sizeof(int)), close_tag_index = 0;
-	*max_close_tag = 8;
-	char *close_tag = malloc(sizeof(char) * 8);
-
-	while((*curr_line)[search_close] != '>') {
-		if ((*curr_line)[search_close] == '\n') {
-			getdelim(curr_line, &buffer_size, 10, file);
-
-			search_close = 0;
-		}
-
-		close_tag[close_tag_index++] = (*curr_line)[search_close];
-		close_tag = resize_arraylist(close_tag, max_close_tag, close_tag_index, sizeof(char));
-		close_tag[close_tag_index] = '\0';
-
-		search_close++;
-	}
-
-	free(max_close_tag);
-
-	return close_tag;
 }
 
 int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read) {
@@ -347,16 +317,71 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 	return str_read_index + 1;
 }
 
-int find_end_comment(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_token) {
+int find_close_tag(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_close) {
+	while((*curr_line)[search_close] != '>') {
+		if ((*curr_line)[search_close] == '\n') {
+			search_close = 0;
+
+			if (!file)
+				str_read += (search_close + 1) * sizeof(char);
+			read_newline(curr_line, buffer_size, file, str_read);
+
+			continue;
+		}
+
+		search_close++;
+	}
+
+	return search_close;
+}
+
+char *read_close_tag(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_close) {
+	int *max_close_tag = malloc(sizeof(int)), close_tag_index = 0;
+	*max_close_tag = 8;
+	char *close_tag = malloc(sizeof(char) * 8);
+
+	while((*curr_line)[search_close] != '>') {
+		if ((*curr_line)[search_close] == '\n') {
+			search_close = 0;
+
+			if (!file)
+				str_read += (search_close + 1) * sizeof(char);
+			read_newline(curr_line, buffer_size, file, str_read);
+
+			continue;
+		}
+
+		close_tag[close_tag_index++] = (*curr_line)[search_close];
+		close_tag = resize_arraylist(close_tag, max_close_tag, close_tag_index, sizeof(char));
+		close_tag[close_tag_index] = '\0';
+
+		search_close++;
+	}
+
+	free(max_close_tag);
+
+	return close_tag;
+}
+
+typedef struct TagRead {
+	char *update_str_read;
+	int new_search_token;
+	int type; // 0 for normal (<div></div>), 1 for closure (<img/>), 2 for comment (<!---->)
+} tag_reader;
+
+tag_reader find_end_comment(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_token) {
+
+	tag_reader tag_read = { .new_search_token = search_token, .type = 2 };
 
 	while (1) {
 		if (search_token > 1 && ((*curr_line)[search_token - 2] == '-' && (*curr_line)[search_token - 1] == '-' && (*curr_line)[search_token] == '>'))
 			break;
 
-		if ((*curr_line)[search_token] == '\n') {
+		if ((int) (*curr_line)[search_token] == 10) {
 			search_token = 0;
 
-			str_read += (search_token + 1) * sizeof(char);
+			if (!file)
+				str_read += (search_token + 1) * sizeof(char);
 			read_newline(curr_line, buffer_size, file, str_read);
 
 			continue;
@@ -365,14 +390,17 @@ int find_end_comment(FILE *file, char *str_read, char **curr_line, size_t *buffe
 		search_token++;
 	}
 
-	return search_token;
+	tag_read.new_search_token = search_token;
+	tag_read.update_str_read = str_read;
+
+	return tag_read;
 }
 
 // builds a new tree and adds it as a child of parent_tree
-int read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_token) {
+tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_token) {
 	// check for comment:
 	if ((*curr_line)[search_token + 1] == '!' && (*curr_line)[search_token + 2] == '-' && (*curr_line)[search_token + 3] == '-')
-		return find_end_comment(file, str_read, curr_line, buffer_size, search_token) * -1;
+		return find_end_comment(file, str_read, curr_line, buffer_size, search_token);
 
 	char *main_tag;
 	search_token = read_main_tag(&main_tag, *curr_line, search_token);
@@ -397,11 +425,22 @@ int read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line,
 	int max_attr_tag_value = 8, attr_tag_value_index = 0;
 	memset(attr_tag_value, '\0', 8);
 
+	int is_img = strcmp(main_tag, "img") == 0;
+	int has_closure = -1;
+	int closure_close_tag_counter = search_token; // ensures checking the correct tag position
+
+	tag_reader tag_read;
+
 	// searching for attributes
 	while ((*curr_line)[search_token] != '>') {
+		has_closure = (*curr_line)[search_token] == '/' ? closure_close_tag_counter : has_closure;
+		closure_close_tag_counter++;
+
 		if ((*curr_line)[search_token] == '\n') {
 			search_token = 0;
 
+			if (!file)
+				str_read += (search_token + 1) * sizeof(char);
 			read_newline(curr_line, buffer_size, file, str_read);
 		}
 
@@ -415,7 +454,7 @@ int read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line,
 			if ((*curr_line)[search_token] == '=') { // switch to reading value
 				read_tag = 0;
 
-				start_attr_value = 0;
+				attr_tag_value_index = 0;
 
 				search_token++;
 				continue;
@@ -442,15 +481,17 @@ int read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line,
 					char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
 					strcpy(tag_name, attr_tag_name);
 
-					char *attr = malloc(sizeof(char) * attr_tag_value_index + 1);
+					char *attr = malloc(sizeof(char) * (attr_tag_value_index + 1));
 					strcpy(attr, attr_tag_value);
 					add_token_attribute(new_tree, tag_name, attr);
 
 					attr_tag_name_index = 0;
-					attr_tag_value_index = 0;
 
 					read_tag = 1;
 					start_attr_value = 0;
+
+					memset(attr_tag_value, '\0', max_attr_tag_value * sizeof(char));
+					memset(attr_tag_name, '\0', max_attr_tag_name * sizeof(char));
 				} else
 					start_attr_value = 1;
 
@@ -474,7 +515,11 @@ int read_tag(token_t *parent_tree, FILE *file, char *str_read, char **curr_line,
 	free(attr_tag_value);
 
 	add_token_children(parent_tree, new_tree);
-	return search_token + 1;
+
+	tag_read.new_search_token = search_token + 1;
+	tag_read.type = is_img || has_closure + 1 == closure_close_tag_counter ? 1 : 0;
+	tag_read.update_str_read = str_read;
+	return tag_read;
 }
 
 int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
@@ -489,8 +534,6 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 	int line = 0;
 
 	while((read_len = read_newline(buffer_reader, buffer_size, file, str_read)) != -1) {
-		printf("LINE #%d\n", line++);
-		printf("\nread buffer at tag: %s: %s\n", curr_tree->tag, *buffer_reader);
 		// move str_read forward
 		str_read += read_len * sizeof(char);
 
@@ -499,29 +542,25 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 
 		while (curr_line[search_token] != '\n' && curr_line[search_token] != '\0') {
 			if (curr_line[search_token] == '<') {
-				printf("search for open: %d\n", search_token);
 				if (curr_line[search_token + 1] == '/') { // close tag
 					// return to parent tree instead
 
 					// check tag name matches curr_tree tag
-					char *check_tag = read_close_tag(file, buffer_reader, search_token + 2);
-					printf("check cmp: %s vs %s\n", check_tag, curr_tree->tag);
 					curr_tree = grab_token_parent(curr_tree);
-					printf("\nmove curr tree up-post: %d %s\n", curr_tree->children_index, curr_tree->tag);
 
-					search_token = find_close_tag(file, buffer_reader, search_token) + 1;
+					search_token = find_close_tag(file, str_read, buffer_reader, buffer_size, search_token) + 1;
 
 					continue;
 				}
 
-				search_token = read_tag(curr_tree, file, str_read, buffer_reader, buffer_size, search_token);
+				tag_reader tag_read = read_tag(curr_tree, file, str_read, buffer_reader, buffer_size, search_token);
+				search_token = tag_read.new_search_token;
 
-				printf("read tag: %d at %s\n", search_token, *buffer_reader);
-				// negative means the token went through a comment (aka continue without adding to curr_tree)
-				if (search_token >= 0) // update curr_tree to dive into the subtree
+				str_read = tag_read.update_str_read;
+
+				// depending on tag_read.type, choose specific path:
+				if (tag_read.type == 0) {
 					curr_tree = grab_token_children(curr_tree);
-				else {
-					search_token *= -1;
 				}
 
 				continue;

@@ -57,14 +57,14 @@ int main() {
 
 		// parse the wiki data and write to the bag of words
 		// res_body(wiki_page)
-		fputs(res_body(wiki_page), index_writer);
+		// fputs(res_body(wiki_page), index_writer);
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
-		// int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
+		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 
-		// if (finish < 0) {
-		// 	printf("\nWRITE ERR\n");
-		// 	return 1;
-		// }
+		if (finish < 0) {
+			printf("\nWRITE ERR\n");
+			return 1;
+		}
 
 		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);

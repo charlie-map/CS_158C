@@ -165,14 +165,14 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 	return 0;
 }
 
-int ll_get_keys(ll_main_t *ll_node, void **keys, int *max_key, int key_index) {
+int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index) {
 	while(ll_node) {
-		keys[key_index++] = ll_node->key.key;
+		(*keys)[key_index++] = ll_node->key.key;
 
 		if (key_index == *max_key) { // resize
 			*max_key *= 2;
 
-			keys = realloc(keys, sizeof(void *) * *max_key);
+			*keys = realloc(*keys, sizeof(void *) * *max_key);
 		}
 
 		ll_node = ll_node->next;
@@ -190,7 +190,7 @@ void **keys__hashmap(hashmap *hash__m, int *max_key) {
 	for (int find_keys = 0; find_keys < hash__m->hashmap__size; find_keys++) {
 		if (hash__m->map[find_keys]) {
 			// search LL:
-			key_index = ll_get_keys(hash__m->map[find_keys], keys, max_key, key_index);
+			key_index = ll_get_keys(hash__m->map[find_keys], &keys, max_key, key_index);
 		}
 	}
 
