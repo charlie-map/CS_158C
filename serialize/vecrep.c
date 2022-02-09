@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "trie.h"
 #include "token.h"
@@ -56,6 +57,30 @@ int main() {
 
 		// parse the wiki data and write to the bag of words
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
+
+		// check title for any extra components:
+		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");
+		char *curr_title_value = data_at_token(check_title_token);
+		if (!strlen(curr_title_value)) {
+			printf("now search\n");
+			// check for a child:
+			int *title_max_length = malloc(sizeof(int));
+			char *new_title = token_read_all_data(check_title_token, title_max_length, NULL, NULL);
+
+			printf("get new title: %s\n", new_title);
+
+			if (strlen(new_title)) // add it!
+				update_token_data(check_title_token, new_title, title_max_length);
+			else {// bad data
+				printf("An error occured with the title of document: %d\n", print_array);
+				exit(1);
+			}
+
+			free(title_max_length);
+			free(new_title);
+		}
+		printf("check title: %s\n", data_at_token(check_title_token));
+
 		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 
 		if (finish < 0) {

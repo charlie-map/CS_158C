@@ -67,6 +67,16 @@ int add_token_rolling_data(token_t *token, char data) {
 	return 0;
 }
 
+int update_token_data(token_t *curr_token, char *new_data, int *new_data_len) {
+	// realloc data to fit new_data_len:
+	*curr_token->max_data = *new_data_len;
+	curr_token->data = realloc(curr_token->data, sizeof(char) * *new_data_len);
+
+	strcpy(curr_token->data, new_data);
+
+	return 0;
+}
+
 int add_token_attribute(token_t *token, char *tag, char *attribute) {
 	token->attribute[token->attr_tag_index++] = tag;
 	token->attribute[token->attr_tag_index++] = attribute;
@@ -106,6 +116,10 @@ token_t *grab_token_children(token_t *parent) {
 
 token_t *grab_token_parent(token_t *curr_token) {
 	return curr_token->parent;
+}
+
+char *data_at_token(token_t *curr_token) {
+	return curr_token->data;
 }
 
 token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
@@ -243,12 +257,14 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 // go through the entire sub tree and create a char ** of all data values
 char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *)) {
 	int data_index = search_token->data_index;
-	*data_max = data_index * 2;
+	printf("data: %d\n", data_index);
+	*data_max = data_index * 2 + (data_index == 0);
 	char **full_data = malloc(sizeof(char *));
 	*full_data = malloc(sizeof(char) * *data_max);
 
 	// read data from curr token:
-	strcpy(*full_data, search_token->data);
+	if (data_index)
+		strcpy(*full_data, search_token->data);
 
 	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked) + 1;
 
