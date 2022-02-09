@@ -12,7 +12,7 @@ token_t *grab_token_by_tag(token_t *start_token, char *tag_name);
 token_t **grab_tokens_by_tag(token_t *start_token, char *tags_name, int *spec_token_max);
 
 char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag);
-char *token_read_all_data(token_t *search_token, int *data_max);
+char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *));
 
 void *resize_arraylist(void *array, int *max_size, int current_index, size_t singleton_size);
 

@@ -345,13 +345,13 @@ socket_t *get_socket(char *HOST, char *PORT) {
 		if ((sock = socket(p->ai_family, p->ai_socktype,
 				p->ai_protocol)) == -1) {
 			perror("client: socket");
-			continue;
+			exit(1);
 		}
 
 		if (connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
 			close(sock);
 			perror("client: connect");
-			continue;
+			exit(1);
 		}
 
 		break;
@@ -359,7 +359,7 @@ socket_t *get_socket(char *HOST, char *PORT) {
 
 	if (p == NULL) {
 		fprintf(stderr, "client: failed to connect\n");
-		return NULL;
+		exit(1);
 	}
 
 	socket_t *data_return = malloc(sizeof(socket_t));

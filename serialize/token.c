@@ -212,13 +212,19 @@ char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag) {
 	return found_tag;
 }
 
-int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index) {
+int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *)) {
 	// search through each child token and add to full_data:
 	for (int add_from_child = 0; add_from_child < search_token->children_index; add_from_child++) {
+		if (block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag)) { // check for if we should avoid this tag (skip the data)
+			// still get children, then skip data collection:
+			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked);
+			continue;
+		}
+
 		// calculate length of the data:
 		int data_len = search_token->children[add_from_child]->data_index;
 
-		data_index += data_len + 1;
+		data_index += data_len + 2;
 		while (data_index > *data_max) {
 			*data_max *= 2;
 			*full_data = realloc(*full_data, sizeof(char) * *data_max);
@@ -228,14 +234,14 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 		strcat(*full_data, " ");
 
 		// get children
-		data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index);
+		data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked);
 	}
 
 	return data_index;
 }
 
 // go through the entire sub tree and create a char ** of all data values
-char *token_read_all_data(token_t *search_token, int *data_max) {
+char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *)) {
 	int data_index = search_token->data_index;
 	*data_max = data_index * 2;
 	char **full_data = malloc(sizeof(char *));
@@ -244,7 +250,7 @@ char *token_read_all_data(token_t *search_token, int *data_max) {
 	// read data from curr token:
 	strcpy(*full_data, search_token->data);
 
-	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index) + 1;
+	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked) + 1;
 
 	*full_data = realloc(*full_data, sizeof(char) * data_index);
 	strcat(*full_data, "\0");

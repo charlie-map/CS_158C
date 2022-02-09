@@ -430,7 +430,6 @@ int ll_insert(ll_main_t *crawler__node, vtableKeyStore key, void *newValue, int 
 		bucket_size++;
 	}
 
-	printf("Testing keys %d\n", crawler__node->key.compareKey(crawler__node->key.key, key.key));
 	if (crawler__node->key.compareKey(crawler__node->key.key, key.key)) {
 		if (hash__type == 0) {
 			crawler__node->ll_meat = ll_specialUpdateIgnore(crawler__node->ll_meat, newValue, destroy);

@@ -29,6 +29,10 @@ char **split_string(char *full_string, char delimeter, int *arr_len) {
 
 	for (int read_string = 0; full_string[read_string]; read_string++) {
 		if (full_string[read_string] == delimeter) { // next phrase
+			// check that current word has some length
+			if (arr[arr_index][0] == '\0')
+				continue;
+
 			arr_index++;
 
 			if (arr_index == *arr_len) {
@@ -39,6 +43,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len) {
 			curr_sub_word_index = 0;
 			*max_curr_sub_word = 8;
 			arr[arr_index] = malloc(sizeof(char) * *max_curr_sub_word);
+			arr[arr_index][0] = '\0';
 
 			continue;
 		}
@@ -60,6 +65,12 @@ char **split_string(char *full_string, char delimeter, int *arr_len) {
 		}
 
 		arr[arr_index][curr_sub_word_index] = '\0';
+	}
+
+	if (arr[arr_index][0] == '\0') { // free position
+		free(arr[arr_index]);
+
+		arr_index--;
 	}
 
 	*arr_len = arr_index + 1;
@@ -85,15 +96,19 @@ void destroy_hashmap_val(void *ptr) {
 	return;
 }
 
+void *is_block(void *hmap, char *tag) {
+	return get__hashmap((hashmap *) hmap, tag);
+}
+
 int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page) {
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
-	char *ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len);
+	char *ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
 	// get title
 	int *title_len = malloc(sizeof(int));
-	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len);
+	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
 
 	// write to title_fp
 	fputs(ID, title_fp);
@@ -108,8 +123,21 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	// grab full page data
 	int *page_data_len = malloc(sizeof(int)), *word_number_max = malloc(sizeof(int));
 	token_t *page_token = grab_token_by_tag(full_page, "text");
-	char *token_page_data = token_read_all_data(page_token, page_data_len);
+
+	// setup a hashmap that will check for blocked tokens:
+	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
+
+	// insert any blocked tags (currently just <style>)
+	int *style_value = malloc(sizeof(int));
+	*style_value = 1;
+	int *a_tag_value = malloc(sizeof(int));
+	*a_tag_value = 1;
+	insert__hashmap(block_tag_check, "style", style_value, "-d");
+	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
+	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max);
+
+	deepdestroy__hashmap(block_tag_check);
 
 	free(page_data_len);
 	free(token_page_data);
@@ -124,7 +152,6 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			// insert into hashmap at word with frequency = 0
 	for (int add_hash = 0; add_hash < *word_number_max; add_hash++) {
 		// check if word is in the stopword trie:
-		printf("search term: %s\n", full_page_data[add_hash]);
 		if (trie_search(stopword_trie, full_page_data[add_hash])) {
 			free(full_page_data[add_hash]);
 			continue; // skip
@@ -142,6 +169,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		hashmap_freq = malloc(sizeof(int));
 		*hashmap_freq = 1;
 
+		//printf("insert into hash: %s\n", full_page_data[add_hash]);
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 	}
 
@@ -156,7 +184,6 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	// loop through keys and input word:freq pairs
 	for (int write_key = 0; write_key < *key_len; write_key++) {
-		printf("search bag: %s\n", keys[write_key]);
 		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key]);
 
 		char *key_freq_str = malloc(sizeof(char) * 11);
@@ -170,12 +197,16 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		fputs(" ", index_fp);
 
 		free(key_freq_str);
-		free(keys[write_key]);
 	}
 
 	fputs("\n", index_fp);
 
 	free(ID);
+
+	// loop and free keys:
+	for (int free_key = 0; free_key < *key_len; free_key++) {
+		free(keys[free_key]);
+	}
 
 	free(keys);
 	free(key_len);
