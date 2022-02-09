@@ -109,7 +109,6 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	// get title
 	int *title_len = malloc(sizeof(int));
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
-	printf("GET TITLE: %s\n", title);
 
 	// write to title_fp
 	fputs(ID, title_fp);

@@ -62,12 +62,9 @@ int main() {
 		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");
 		char *curr_title_value = data_at_token(check_title_token);
 		if (!strlen(curr_title_value)) {
-			printf("now search\n");
 			// check for a child:
 			int *title_max_length = malloc(sizeof(int));
 			char *new_title = token_read_all_data(check_title_token, title_max_length, NULL, NULL);
-
-			printf("get new title: %s\n", new_title);
 
 			if (strlen(new_title)) // add it!
 				update_token_data(check_title_token, new_title, title_max_length);
@@ -79,7 +76,6 @@ int main() {
 			free(title_max_length);
 			free(new_title);
 		}
-		printf("check title: %s\n", data_at_token(check_title_token));
 
 		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
 
@@ -98,6 +94,9 @@ int main() {
 	free(array_length);
 
 	res_destroy(response);
+
+	fclose(index_writer);
+	fclose(title_writer);
 
 	destroy_socket(sock_data);
 	trie_destroy(stopword_trie);

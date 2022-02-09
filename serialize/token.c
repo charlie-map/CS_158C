@@ -238,13 +238,17 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 		// calculate length of the data:
 		int data_len = search_token->children[add_from_child]->data_index;
 
+		int prev_data_index = data_index;
 		data_index += data_len + 2;
 		while (data_index > *data_max) {
 			*data_max *= 2;
 			*full_data = realloc(*full_data, sizeof(char) * *data_max);
 		}
 
-		strcat(*full_data, search_token->children[add_from_child]->data);
+		if (!prev_data_index) // copy to make sure we start at the very beginning
+			strcpy(*full_data, search_token->children[add_from_child]->data);
+		else
+			strcat(*full_data, search_token->children[add_from_child]->data);
 		strcat(*full_data, " ");
 
 		// get children
@@ -257,7 +261,6 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 // go through the entire sub tree and create a char ** of all data values
 char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *)) {
 	int data_index = search_token->data_index;
-	printf("data: %d\n", data_index);
 	*data_max = data_index * 2 + (data_index == 0);
 	char **full_data = malloc(sizeof(char *));
 	*full_data = malloc(sizeof(char) * *data_max);
