@@ -505,8 +505,10 @@ tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **cur
 				continue;
 			}
 
-			if (!start_attr_value)
+			if (!start_attr_value) {
+				search_token++;
 				continue;
+			}
 
 			attr_tag_value[attr_tag_value_index++] = (*curr_line)[search_token];
 

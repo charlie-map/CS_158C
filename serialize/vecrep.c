@@ -51,6 +51,7 @@ int main() {
 
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	for (int print_array = 0; print_array < *array_length; print_array++) {
+		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
 		// parse the wiki data and write to the bag of words
