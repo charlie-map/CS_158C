@@ -3,8 +3,19 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "hashmap.h"
 #include "serialize.h"
+#include "../stemmer.h"
+
+struct IDF_Track {
+	int prev_idf_index; // last document to be added (for checking dupes)
+	int document_freq; // occurrences of documents that contain term
+};
+
+void hashmap_destroy_idf(void *p) {
+	free((idf_t *) p);
+
+	return;
+}
 
 // create index structure
 
@@ -100,7 +111,7 @@ void *is_block(void *hmap, char *tag) {
 	return get__hashmap((hashmap *) hmap, tag);
 }
 
-int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page) {
+int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash) {
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
@@ -145,6 +156,8 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	// create hashmap representation:
 	hashmap *word_freq_hash = make__hashmap(0, NULL, destroy_hashmap_val);
 
+	int sum_of_squares = 0; // calculate sum of squares
+
 	// loop through full_page_data and for each word:
 		// check if the word is already in the hashmap, if it is:
 			// add to the frequency for that word
@@ -157,8 +170,11 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			continue; // skip
 		}
 
+		full_page_data[add_hash][stem(full_page_data[add_hash], 0, strlen(full_page_data[add_hash]) - 1) + 1] = 0;
+
 		// get from word_freq_hash:
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash]);
+		idf_t *idf = get__hashmap(idf_hash, full_page_data[add_hash]);
 
 		if (hashmap_freq) {
 			free(full_page_data[add_hash]);
@@ -169,8 +185,20 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		hashmap_freq = malloc(sizeof(int));
 		*hashmap_freq = 1;
 
-		//printf("insert into hash: %s\n", full_page_data[add_hash]);
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
+
+		// check prev_idf_index to make sure it doesn't match current index
+		if (idf && idf->prev_idf_index == print_array) // skip (duplicate)
+			continue;
+		else (idf) {// add to current frequency
+			idf->document_freq++;
+			idf->prev_idf_index = print_array;
+		} else {
+			idf = malloc(sizeof(idf_t));
+			idf->document_freq = 1;
+			idf->prev_idf_index = print_array;
+			insert__hashmap(idf_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
+		}
 	}
 
 	free(word_number_max);
@@ -180,7 +208,18 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	// setup index file:
 	fputs(ID, index_fp);
-	fputs(": ", index_fp);
+
+	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
+		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums]);
+		sum_of_squares += key_freq * key_freq;
+	}
+	char *sum_square_char = malloc(sizeof(char) * 13);
+	memset(sum_square_char, '\0', sizeof(char) * 13);
+
+	sprintf(sum_square_char, " %d ", sum_square_char);
+	fputs(sum_square_char, index_fp);
+
+	free(sum_square_char);
 
 	// loop through keys and input word:freq pairs
 	for (int write_key = 0; write_key < *key_len; write_key++) {

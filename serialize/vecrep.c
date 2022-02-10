@@ -44,6 +44,10 @@ int main() {
 	FILE *title_writer = fopen("title.txt", "w");
 	socket_t *sock_data = get_socket(HOST, PORT);
 
+	// calculate idf for each term
+	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
+
+	// initial header request
 	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 
 	// pull array
@@ -51,6 +55,7 @@ int main() {
 	char **array_body = handle_array(res_body(response), array_length);
 
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
+	// loop pages and pull
 	for (int print_array = 0; print_array < *array_length; print_array++) {
 		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
@@ -77,7 +82,7 @@ int main() {
 			free(new_title);
 		}
 
-		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token);
+		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
 
 		if (finish < 0) {
 			printf("\nWRITE ERR\n");
