@@ -40,7 +40,7 @@ int main() {
 	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
 
 	// create write stream:
-	FILE *index_writer = fopen("predocbags.txt", "rw");
+	FILE *index_writer = fopen("predocbags.txt", "r");
 	FILE *title_writer = fopen("title.txt", "w");
 	socket_t *sock_data = get_socket(HOST, PORT);
 
@@ -108,6 +108,7 @@ int main() {
 
 	res_destroy(response);
 
+	fclose(index_writer);
 	fclose(title_writer);
 
 	destroy_socket(sock_data);
@@ -116,10 +117,12 @@ int main() {
 	// now we have idf for all terms, and the length of each bag of terms
 	// we can go back through the writer again and pull each document out one
 	// at a time and recalculate each term frequency with the new idf value
-	FILE *new_index_reader = fopen("docbags.txt", "w");
-	word_bag_idf(index_writer, new_index_reader, idf, doc_bag_length, index_doc_bag);
+	FILE *old_reader = fopen("predocbags.txt", "r");
+	FILE *new_index_writer = fopen("docbags.txt", "w");
+	word_bag_idf(old_reader, new_index_writer, idf, doc_bag_length, index_doc_bag);
 
-	fclose(index_writer);
+	fclose(old_reader);
+	fclose(new_index_writer);
 
 	return 0;
 }

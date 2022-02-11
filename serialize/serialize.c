@@ -49,6 +49,22 @@ int delimeter_check(char curr_char, char *delims) {
 	int (*is_delim)(char delim, char *delimeters):
 		gives the options to instead have multi delimeters
 		use: "-d" to have is_delim and char *delimeters passed in
+	int (*is_range)(char _char):
+		checks for range: default is (with chars) first one:
+				number range as well is second one:
+		use: "-r" to access range functions
+*/
+	int char_is_range(char _char) {
+		return (((int) _char >= 65 && (int) _char <= 90) || ((int) _char >= 97 && (int) _char <= 122));
+	}
+
+	int num_is_range(char _char) {
+		printf("num range: %c %d\n", _char, (int) _char);
+		return (((int) _char >= 65 && (int) _char <= 90) ||
+			((int) _char >= 97 && (int) _char <= 122) ||
+			((int) _char >= 48 && (int) _char <= 57));
+	}
+/*
 */
 char **split_string(char *full_string, char delimeter, int *arr_len, char *extra, ...) {
 	va_list param;
@@ -57,6 +73,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	int **minor_length = NULL;
 	int (*is_delim)(char, char *) = NULL;
 	char *multi_delims = NULL;
+
+	int (*is_range)(char _char) = char_is_range;
 
 	for (int check_extra = 0; extra[check_extra]; check_extra++) {
 		if (extra[check_extra] != '-')
@@ -67,6 +85,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 		else if (extra[check_extra + 1] == 'd') {
 			is_delim = va_arg(param, int (*)(char, char *));
 			multi_delims = va_arg(param, char *);
+		} else if (extra[check_extra + 1] == 'r') {
+			is_range = va_arg(param, int (*)(char));
 		}
 	}
 
@@ -107,12 +127,11 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 		}
 
 		// if not in range, skip:
-		if (((int) full_string[read_string] < 65 || (int) full_string[read_string] > 90) &&
-			((int) full_string[read_string] < 97 || (int) full_string[read_string] > 122))
+		if (!is_range(full_string[read_string]))
 			continue;
 
 		// if a capital letter, lowercase
-		if ((int) full_string[read_string] <= 90)
+		if ((int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
 			full_string[read_string] = (char) ((int) full_string[read_string] + 32);
 
 		arr[arr_index][curr_sub_word_index++] = full_string[read_string];
@@ -166,7 +185,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	int *ID_len = malloc(sizeof(int));
 	char *ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
-	total_bag_size += *ID_len + 1;
+	total_bag_size += *ID_len - 1;
 
 	// get title
 	int *title_len = malloc(sizeof(int));
@@ -224,7 +243,8 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			continue; // skip
 		}
 
-		full_page_data[add_hash][stem(full_page_data[add_hash], 0, strlen(full_page_data[add_hash]) - 1) + 1] = 0;
+		phrase_len[add_hash] = stem(full_page_data[add_hash], 0, phrase_len[add_hash] - 1) + 1;
+		full_page_data[add_hash][phrase_len[add_hash]] = 0;
 
 		// get from word_freq_hash:
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash]);
@@ -274,6 +294,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	memset(sum_square_char, '\0', sizeof(char) * 13);
 
 	sprintf(sum_square_char, " %d ", sum_square_char);
+	total_bag_size += strlen(sum_square_char);
 	fputs(sum_square_char, index_fp);
 
 	free(sum_square_char);
@@ -314,7 +335,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 int word_bag_idf(FILE *index_reader, FILE *index_outputter, hashmap *idf, int *word_bag_len, int word_bag_len_max) {
 	// for each doc in word_bag_len:
 	for (int doc = 0; doc < 1; doc++) {
-		char *word_bag;
+		char *word_bag = malloc(sizeof(char) * word_bag_len[doc]);
 
 		// read the contents into word_bag
 		printf("reading %d doc: %d\n", doc, word_bag_len[doc]);
@@ -323,10 +344,24 @@ int word_bag_idf(FILE *index_reader, FILE *index_outputter, hashmap *idf, int *w
 		// splice word_bag by multi_delimeters:
 		// use " " and ":" as delimeters
 		int *word_bag_words_max = malloc(sizeof(int));
-		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d", delimeter_check, " :");
+		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
 
-		for (int check_doc = 0; check_doc < *word_bag_words_max; check_doc++) {
-			printf("%s", word_bag_words[check_doc]);
+		// setup new file:
+		fputs(word_bag_words[0], index_outputter);
+		fputs(" ", index_outputter);
+		fputs(word_bag_words[1], index_outputter);
+		fputs(" ", index_outputter);
+
+		// for each word:freq pair:
+		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc++) {
+			// take freq and change to an into representation
+			float curr_freq = atoi(word_bag_words[check_doc + 1]) * 1.0;
+
+			// devide curr frequency by the inverse document frequency of current word:
+			curr_freq /= get__hashmap(idf, word_bag_words[check_doc]);
+
+			// change float curr_freq to a char *:
+			
 		}
 	}
 
