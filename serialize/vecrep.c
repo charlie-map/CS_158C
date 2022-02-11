@@ -40,12 +40,14 @@ int main() {
 	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
 
 	// create write stream:
-	FILE *index_writer = fopen("docbags.txt", "w");
+	FILE *index_writer = fopen("predocbags.txt", "rw");
 	FILE *title_writer = fopen("title.txt", "w");
 	socket_t *sock_data = get_socket(HOST, PORT);
 
 	// calculate idf for each term
 	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
+	int *doc_bag_length = malloc(sizeof(int) * 8);
+	int doc_bag_length_max = 8, index_doc_bag = 0;
 
 	// initial header request
 	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
@@ -56,7 +58,7 @@ int main() {
 
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	// loop pages and pull
-	for (int print_array = 0; print_array < *array_length; print_array++) {
+	for (int print_array = 0; print_array < 1; print_array++) {
 		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
@@ -82,11 +84,17 @@ int main() {
 			free(new_title);
 		}
 
-		int finish = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
+		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
 
-		if (finish < 0) {
+		if (doc_bag_length[index_doc_bag - 1] < 0) {
 			printf("\nWRITE ERR\n");
 			return 1;
+		}
+
+		// check resize:
+		if (index_doc_bag == doc_bag_length_max) {
+			doc_bag_length_max *= 2;
+			doc_bag_length = realloc(doc_bag_length, sizeof(int) * doc_bag_length_max);
 		}
 
 		destroy_token(new_wiki_page_token);
@@ -100,11 +108,18 @@ int main() {
 
 	res_destroy(response);
 
-	fclose(index_writer);
 	fclose(title_writer);
 
 	destroy_socket(sock_data);
 	trie_destroy(stopword_trie);
+
+	// now we have idf for all terms, and the length of each bag of terms
+	// we can go back through the writer again and pull each document out one
+	// at a time and recalculate each term frequency with the new idf value
+	FILE *new_index_reader = fopen("docbags.txt", "w");
+	word_bag_idf(index_writer, new_index_reader, idf, doc_bag_length, index_doc_bag);
+
+	fclose(index_writer);
 
 	return 0;
 }

@@ -18,6 +18,14 @@ void hashmap_destroy_idf(void *p) {
 }
 
 // create index structure
+int delimeter_check(char curr_char, char *delims) {
+	for (int check_delim = 0; delims[check_delim]; check_delim++) {
+		if (delims[check_delim] == curr_char)
+			return 1;
+	}
+
+	return 0;
+}
 
 /*
 	goes through a char * to create an array of char * that are split
@@ -28,8 +36,40 @@ void hashmap_destroy_idf(void *p) {
 	then using split_string(example, ','); would return:
 
 	["Hi", "I am happy", "as of now", "thanks"]
+
+	-- UPDATE: 
+	char *param:
+		place directly after arr_len,
+		-- uses a pattern to signify more parameters
+	int **minor_length:
+		stores the length of each position in the returned char **
+		use: "-l" to access push in minor_length
+		-- only used if passed, otherwise null
+		-- int ** will have same length as char **
+	int (*is_delim)(char delim, char *delimeters):
+		gives the options to instead have multi delimeters
+		use: "-d" to have is_delim and char *delimeters passed in
 */
-char **split_string(char *full_string, char delimeter, int *arr_len) {
+char **split_string(char *full_string, char delimeter, int *arr_len, char *extra, ...) {
+	va_list param;
+	va_start(param, extra);
+
+	int **minor_length = NULL;
+	int (*is_delim)(char, char *) = NULL;
+	char *multi_delims = NULL;
+
+	for (int check_extra = 0; extra[check_extra]; check_extra++) {
+		if (extra[check_extra] != '-')
+			continue;
+
+		if (extra[check_extra + 1] == 'l')
+			minor_length = va_arg(param, int **);
+		else if (extra[check_extra + 1] == 'd') {
+			is_delim = va_arg(param, int (*)(char, char *));
+			multi_delims = va_arg(param, char *);
+		}
+	}
+
 	int arr_index = 0;
 	*arr_len = 8;
 	char **arr = malloc(sizeof(char *) * *arr_len);
@@ -39,16 +79,23 @@ char **split_string(char *full_string, char delimeter, int *arr_len) {
 	arr[arr_index] = malloc(sizeof(char) * *max_curr_sub_word);
 
 	for (int read_string = 0; full_string[read_string]; read_string++) {
-		if (full_string[read_string] == delimeter) { // next phrase
+		if ((is_delim && is_delim(full_string[read_string], multi_delims)) || full_string[read_string] == delimeter) { // next phrase
 			// check that current word has some length
 			if (arr[arr_index][0] == '\0')
 				continue;
+
+			// quickly copy curr_sub_word_index into minor_length if minor_length is defined:
+			if (minor_length)
+				(*minor_length)[arr_index] = curr_sub_word_index;
 
 			arr_index++;
 
 			if (arr_index == *arr_len) {
 				*arr_len *= 2;
 				arr = realloc(arr, sizeof(char *) * *arr_len);
+
+				if (minor_length)
+					*minor_length = realloc(*minor_length, sizeof(int) * *arr_len);
 			}
 
 			curr_sub_word_index = 0;
@@ -112,10 +159,14 @@ void *is_block(void *hmap, char *tag) {
 }
 
 int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash) {
+	int total_bag_size = 0;
+
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
 	char *ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+
+	total_bag_size += *ID_len + 1;
 
 	// get title
 	int *title_len = malloc(sizeof(int));
@@ -146,7 +197,10 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	insert__hashmap(block_tag_check, "style", style_value, "-d");
 	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
 	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
-	char **full_page_data = split_string(token_page_data, ' ', word_number_max);
+
+	// create an int array so we can know the length of each char *
+	int *phrase_len = malloc(sizeof(int) * 8);
+	char **full_page_data = split_string(token_page_data, ' ', word_number_max, "-l", &phrase_len);
 
 	deepdestroy__hashmap(block_tag_check);
 
@@ -154,7 +208,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	free(token_page_data);
 
 	// create hashmap representation:
-	hashmap *word_freq_hash = make__hashmap(0, NULL, destroy_hashmap_val);
+	hashmap *word_freq_hash = make__hashmap(0, NULL, NULL);
 
 	int sum_of_squares = 0; // calculate sum of squares
 
@@ -182,26 +236,29 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			continue;
 		}
 
+		total_bag_size += phrase_len[add_hash];
+
 		hashmap_freq = malloc(sizeof(int));
 		*hashmap_freq = 1;
 
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 
 		// check prev_idf_index to make sure it doesn't match current index
-		if (idf && idf->prev_idf_index == print_array) // skip (duplicate)
+		if (idf && idf->prev_idf_index == add_hash) // skip (duplicate)
 			continue;
-		else (idf) {// add to current frequency
+		else if (idf) { // add to current frequency
 			idf->document_freq++;
-			idf->prev_idf_index = print_array;
+			idf->prev_idf_index = add_hash;
 		} else {
 			idf = malloc(sizeof(idf_t));
 			idf->document_freq = 1;
-			idf->prev_idf_index = print_array;
-			insert__hashmap(idf_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
+			idf->prev_idf_index = add_hash;
+			insert__hashmap(idf_hash, full_page_data[add_hash], idf, "", compareCharKey, NULL);
 		}
 	}
 
 	free(word_number_max);
+	free(phrase_len);
 
 	int *key_len = malloc(sizeof(int));
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
@@ -225,33 +282,53 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	for (int write_key = 0; write_key < *key_len; write_key++) {
 		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key]);
 
-		char *key_freq_str = malloc(sizeof(char) * 11);
-		memset(key_freq_str, '\0', sizeof(char) * 11);
+		char *key_freq_str = malloc(sizeof(char) * 13);
+		memset(key_freq_str, '\0', sizeof(char) * 13);
 
-		sprintf(key_freq_str, "%d", *(int *) key_freq);
+		sprintf(key_freq_str, ":%d ", *(int *) key_freq);
+
+		// add length of key_freq_str to bag_size:
+		total_bag_size += strlen(key_freq_str);
 
 		fputs(keys[write_key], index_fp);
-		fputs(":", index_fp);
 		fputs(key_freq_str, index_fp);
-		fputs(" ", index_fp);
 
 		free(key_freq_str);
 	}
 
 	fputs("\n", index_fp);
+	total_bag_size++;
 
 	free(ID);
-
-	// loop and free keys:
-	for (int free_key = 0; free_key < *key_len; free_key++) {
-		free(keys[free_key]);
-	}
 
 	free(keys);
 	free(key_len);
 
 	deepdestroy__hashmap(word_freq_hash);
 	free(full_page_data);
+
+	return total_bag_size;
+}
+
+// NOTE: index_reader and index_outputter should be diferent files!
+int word_bag_idf(FILE *index_reader, FILE *index_outputter, hashmap *idf, int *word_bag_len, int word_bag_len_max) {
+	// for each doc in word_bag_len:
+	for (int doc = 0; doc < 1; doc++) {
+		char *word_bag;
+
+		// read the contents into word_bag
+		printf("reading %d doc: %d\n", doc, word_bag_len[doc]);
+		fread(word_bag, sizeof(char), word_bag_len[doc], index_reader);
+
+		// splice word_bag by multi_delimeters:
+		// use " " and ":" as delimeters
+		int *word_bag_words_max = malloc(sizeof(int));
+		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d", delimeter_check, " :");
+
+		for (int check_doc = 0; check_doc < *word_bag_words_max; check_doc++) {
+			printf("%s", word_bag_words[check_doc]);
+		}
+	}
 
 	return 0;
 }

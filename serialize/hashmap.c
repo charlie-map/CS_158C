@@ -495,12 +495,12 @@ int ll_destroy(ll_main_t *node, void (destroyObjectPayload)(void *)) {
 		if (node->key.destroyKey)
 			node->key.destroyKey(node->key.key);
 
-		if (node->isArray) {
+		if (node->isArray && destroyObjectPayload) {
 			for (int destroyVal = 0; destroyVal < node->arrIndex + 1; destroyVal++)
 				destroyObjectPayload(((void **)node->ll_meat)[destroyVal]);
 
 			free(node->ll_meat);
-		} else
+		} else if (destroyObjectPayload)
 			destroyObjectPayload(node->ll_meat);
 
 		node_nextStore = node->next;
