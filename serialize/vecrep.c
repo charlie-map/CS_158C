@@ -14,6 +14,8 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
+#define DTF_THRESHOLD 3
+
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
 
@@ -26,8 +28,10 @@ trie_t *fill_stopwords(char *stop_word_file) {
 
 	size_t word_len = 16 * sizeof(char);
 	char *word = malloc(word_len);
-	while (getline(&word, &word_len, stop_fp) != -1)
+	while (getline(&word, &word_len, stop_fp) != -1) {
+		printf("%s\n", word);
 		trie_insert(trie, word);
+	}
 
 	free(word);
 	fclose(stop_fp);
@@ -118,11 +122,9 @@ int main() {
 	// we can go back through the writer again and pull each document out one
 	// at a time and recalculate each term frequency with the new idf value
 	FILE *old_reader = fopen("predocbags.txt", "r");
-	FILE *new_index_writer = fopen("docbags.txt", "w");
-	word_bag_idf(old_reader, new_index_writer, idf, doc_bag_length, index_doc_bag);
+	word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
 
 	fclose(old_reader);
-	fclose(new_index_writer);
 
 	return 0;
 }

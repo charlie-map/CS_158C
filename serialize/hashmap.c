@@ -224,12 +224,14 @@ void *get__hashmap(hashmap *hash__m, void *key) {
 	while (ll_search) {
 		if (ll_search->key.compareKey(ll_search->key.key, key)) { // found a match
 
+			hashmap__response *returnMeat = malloc(sizeof(hashmap__response));
+			returnMeat->key = ll_search->key.key;
 			// depending on the type and mode, this will just return
 			// the value:
-			if (hash__m->hash__type == 0)
-				return ll_search->ll_meat;
-			else {
-				hashmap__response *returnMeat = malloc(sizeof(hashmap__response));
+			if (hash__m->hash__type == 0) {
+				returnMeat->payload = ll_search->ll_meat;
+				returnMeat->payload__length = 1;;
+			} else {
 
 				if (ll_search->isArray) {
 					returnMeat->payload = ll_search->ll_meat;
@@ -246,9 +248,9 @@ void *get__hashmap(hashmap *hash__m, void *key) {
 					returnMeat->payload = ll_search->ll_meat;
 					returnMeat->payload__length = ll_search->arrIndex + 1;
 				}
-
-				return returnMeat;
 			}
+
+			return returnMeat;
 		}
 
 		ll_search = ll_next(ll_search);

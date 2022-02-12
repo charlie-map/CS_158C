@@ -2,6 +2,8 @@
 #define __HASH_T__
 
 typedef struct ReturnHashmap { // used only for type 1
+	char *key; // pointer to the char * used inside the actual hashmap for the key
+			   // specific use case for this project only
 	void **payload;
 	int payload__length;
 } hashmap__response;
@@ -10,6 +12,7 @@ typedef struct Store hashmap;
 
 hashmap *make__hashmap(int hash__type, void (*printer)(void *), void (*destroy)(void *));
 
+void *getKey__hashmap(hashmap *hash__m, void *key);
 void **keys__hashmap(hashmap *hash__m, int *max_key);
 void *get__hashmap(hashmap *hash__m, void *key);
 

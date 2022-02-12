@@ -331,38 +331,63 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	return total_bag_size;
 }
 
-// NOTE: index_reader and index_outputter should be diferent files!
-int word_bag_idf(FILE *index_reader, FILE *index_outputter, hashmap *idf, int *word_bag_len, int word_bag_len_max) {
-	// for each doc in word_bag_len:
-	for (int doc = 0; doc < 1; doc++) {
-		char *word_bag = malloc(sizeof(char) * word_bag_len[doc]);
+typedef struct HashmapBody {
+	char *id;
+	char *mag;
+	hashmap *map;
+} hashmap_body_t;
+
+void destroy_hashmap_float(void *v) {
+	free((float *) v);
+
+	return;
+}
+
+int compareFloatKey(void *v1, void *v2) {
+	return *(float *) v1 < *(float *) v2;
+}
+
+int word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_bag_len_max, int dtf_drop_threshold) {
+	hashmap_body_t **doc = malloc(sizeof(hashmap_body_t *) * word_bag_len_max);
+
+	// for each doc in word_bag_len get the tf-idf of each word:
+	for (int doc_index = 0; doc_index < 1; doc_index++) {
+		char *word_bag = malloc(sizeof(char) * word_bag_len[doc_index]);
 
 		// read the contents into word_bag
-		printf("reading %d doc: %d\n", doc, word_bag_len[doc]);
-		fread(word_bag, sizeof(char), word_bag_len[doc], index_reader);
+		fread(word_bag, sizeof(char), word_bag_len[doc_index], index_reader);
 
 		// splice word_bag by multi_delimeters:
 		// use " " and ":" as delimeters
 		int *word_bag_words_max = malloc(sizeof(int));
 		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
 
-		// setup new file:
-		fputs(word_bag_words[0], index_outputter);
-		fputs(" ", index_outputter);
-		fputs(word_bag_words[1], index_outputter);
-		fputs(" ", index_outputter);
+		hashmap_body_t *new_map = malloc(sizeof(hashmap_body_t));
+
+		new_map->id = word_bag_words[0];
+		new_map->mag = word_bag_words[1];
+		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
 		// for each word:freq pair:
-		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc++) {
-			// take freq and change to an into representation
-			float curr_freq = atoi(word_bag_words[check_doc + 1]) * 1.0;
+		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
+			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc]);
+			free(word_bag_words[check_doc]);
 
-			// devide curr frequency by the inverse document frequency of current word:
-			curr_freq /= get__hashmap(idf, word_bag_words[check_doc]);
+			if (*(float *) word_dtf->payload < dtf_drop_threshold) {
+				free(word_bag_words[check_doc + 1]);
 
-			// change float curr_freq to a char *:
-			
+				continue;
+			}
+
+			float *term_freq = malloc(sizeof(float));
+			*term_freq = (float) atoi(word_bag_words[check_doc + 1]) / *(float *) word_dtf->payload;
+			free(word_bag_words[check_doc + 1]);
+
+			printf("feature %s strength: %1.3f\n", word_dtf->key, *term_freq);
+			insert__hashmap(new_map->map, word_dtf->key, term_freq, "", compareFloatKey, NULL);
 		}
+
+		doc[doc_index] = new_map;
 	}
 
 	return 0;
