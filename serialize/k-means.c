@@ -147,12 +147,19 @@ float *centroid_mean_calculate(cluster_t **centroids, int k, hashmap_body_t **do
 // take all values in m2 and copy them into m1
 int copy__hashmap(hashmap *m1, hashmap *m2) {
 	int *m2_value_len = malloc(sizeof(int));
-	void **m2_words = keys__hashmap(m2, m2_value_len);
+	char **m2_words = (char **) keys__hashmap(m2, m2_value_len);
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 		float *m1_new_value = malloc(sizeof(float));
 		printf("copy string %s\n", m2_words[cp_value]);
-		*m1_new_value = *(int *) get__hashmap(m2, m2_words[cp_value], 0) * 1.0;
+		void *test = get__hashmap(m2, m2_words[cp_value], 0);
+		
+		if (!test) {
+			printf("FREE\n");
+			free(m2_words[cp_value]);
+			continue;
+		}
+		*m1_new_value = *(int *) test * 1.0;
 
 		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", NULL, NULL);
 

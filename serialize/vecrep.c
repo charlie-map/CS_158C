@@ -15,7 +15,7 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
-#define DTF_THRESHOLD 1
+#define DTF_THRESHOLD 0
 #define CLUSTER_THRESHOLD 2
 
 trie_t *fill_stopwords(char *stop_word_file) {
@@ -123,6 +123,8 @@ int main() {
 	// at a time and recalculate each term frequency with the new idf value
 	FILE *old_reader = fopen("predocbags.txt", "r");
 	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
+
+	return 0;
 
 	fclose(old_reader);
 
