@@ -292,7 +292,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	char *sum_square_char = malloc(sizeof(char) * 13);
 	memset(sum_square_char, '\0', sizeof(char) * 13);
 
-	sprintf(sum_square_char, " %d ", sum_square_char);
+	sprintf(sum_square_char, " %d ", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
 	fputs(sum_square_char, index_fp);
 
@@ -352,6 +352,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 
 	// for each doc in word_bag_len get the tf-idf of each word:
 	for (int doc_index = 0; doc_index < 1; doc_index++) {
+		printf("LEN: %d\n", word_bag_len[doc_index]);
 		char *word_bag = malloc(sizeof(char) * (word_bag_len[doc_index] + 1));
 
 		// read the contents into word_bag

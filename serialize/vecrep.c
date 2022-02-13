@@ -90,6 +90,9 @@ int main() {
 
 		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
 
+		printf("final len: %d\n", doc_bag_length[index_doc_bag - 1]);
+		return 0;
+
 		if (doc_bag_length[index_doc_bag - 1] < 0) {
 			printf("\nWRITE ERR\n");
 			return 1;
