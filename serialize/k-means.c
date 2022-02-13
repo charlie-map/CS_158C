@@ -90,14 +90,16 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 
 			// find most similar centroid using cosine similarity (largest value returned is most similar):
 			int max_centroid = 0;
-			float min = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
+			float max = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
 			for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
 				
 				float check_max = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag,
 					cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
 
-				if (check_max < min) {
-					min = check_max;
+				printf("cmp %1.3f %1.3f\n", max, check_max);
+
+				if (check_max > max) {
+					max = check_max;
 					max_centroid = curr_centroid;
 				}
 			}

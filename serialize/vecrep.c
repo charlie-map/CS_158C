@@ -133,9 +133,9 @@ int main() {
 	fclose(old_reader);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 3, CLUSTER_THRESHOLD);
+	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 4, CLUSTER_THRESHOLD);
 
-	for (int check_cluster = 0; check_cluster < 3; check_cluster++) {
+	for (int check_cluster = 0; check_cluster < 4; check_cluster++) {
 		printf("-----Check docs on %d-----\n", check_cluster + 1);
 
 		for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
