@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -329,12 +330,6 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	return total_bag_size;
 }
 
-struct HashmapBody {
-	char *id;
-	char *mag;
-	hashmap *map;
-};
-
 void destroy_hashmap_float(void *v) {
 	free((float *) v);
 
@@ -376,7 +371,8 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		hashmap_body_t *new_map = malloc(sizeof(hashmap_body_t));
 
 		new_map->id = word_bag_words[0];
-		new_map->mag = word_bag_words[1];
+		new_map->mag = atoi(word_bag_words[1]) * 1.0;
+		new_map->sqrt_mag = sqrt(new_map->mag);
 		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
 		// for each word:freq pair:

@@ -10,7 +10,11 @@ void hashmap_destroy_idf(void *p);
 
 int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf);
 
-typedef struct HashmapBody hashmap_body_t;
+typedef struct HashmapBody {
+	char *id;
+	float mag, sqrt_mag;
+	hashmap *map;
+} hashmap_body_t;
 void destroy_hashmap_body(hashmap_body_t *body_hash);
 hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_bag_len_max, int dtf_drop_threshold);
 
