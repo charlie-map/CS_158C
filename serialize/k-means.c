@@ -96,8 +96,6 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 				float check_max = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag,
 					cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
 
-				printf("cmp %1.3f %1.3f\n", max, check_max);
-
 				if (check_max > max) {
 					max = check_max;
 					max_centroid = curr_centroid;
