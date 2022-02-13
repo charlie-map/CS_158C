@@ -342,7 +342,6 @@ int compareFloatKey(void *v1, void *v2) {
 
 void destroy_hashmap_body(hashmap_body_t *body_hash) {
 	free(body_hash->id);
-	free(body_hash->mag);
 
 	deepdestroy__hashmap(body_hash->map);
 
