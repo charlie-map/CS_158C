@@ -68,7 +68,7 @@ int main() {
 
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	// loop pages and pull
-	for (int print_array = 0; print_array < 1; print_array++) {
+	for (int print_array = 0; print_array < 5; print_array++) {
 		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
@@ -130,21 +130,12 @@ int main() {
 	FILE *old_reader = fopen("predocbags.txt", "r");
 	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
 
-	int *key_num = malloc(sizeof(int));
-	char **keys = (char **) keys__hashmap(feature_space[0]->map, key_num);
-
-	for (int check_key = 0; check_key < *key_num; check_key++) {
-		printf("%s %1.3f\n", keys[check_key], *(float *) get__hashmap(feature_space[0]->map, keys[check_key], 0));
-	}
-
-	return 0;
-
 	fclose(old_reader);
 
 	// start k-means to calculate clusters
 	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 2, CLUSTER_THRESHOLD);
 
-	for (int check_cluster = 0; check_cluster < 2; check_cluster) {
+	for (int check_cluster = 0; check_cluster < 2; check_cluster++) {
 		printf("-----Check docs on %d-----\n", check_cluster + 1);
 
 		for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {

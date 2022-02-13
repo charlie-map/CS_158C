@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "k-means.h"
 
@@ -15,18 +16,30 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 	float dot_product = 0;
 	for (int calc_dp = 0; calc_dp < *centroid_key_len; calc_dp++) {
 		// grab value from each map
-		void *pre_doc_word_tfidf = get__hashmap(centroid, centroid_key[calc_dp], 0);
-		if (!pre_doc_word_tfidf) {// insert into centroid with new data
+		char *key = centroid_key[calc_dp];
+		printf("key: %s\n", key);
+
+		void *pre_doc_word_tfidf = get__hashmap(centroid, key, 0);
+		if (!pre_doc_word_tfidf) { // insert into centroid with new data
 			float *new_centroid_data = malloc(sizeof(float));
 			*new_centroid_data = 0.0;
-			insert__hashmap(centroid, centroid_key[calc_dp], new_centroid_data, "", NULL, NULL);
+			insert__hashmap(centroid, key, new_centroid_data, "", compareCharKey, NULL);
 		}
 
-		int doc_word_tfidf = pre_doc_word_tfidf ? *(int *) pre_doc_word_tfidf : 0;
-		int centroid_word_tfidf = *(int *) get__hashmap(doc, centroid_key[calc_dp], 0);
+		float doc_word_tfidf = pre_doc_word_tfidf ? *(float *) pre_doc_word_tfidf : 0.0;
+		void *test = get__hashmap(doc, key, 0);
+		if (!test) {
+			printf("UH OH %d %s\n", calc_dp, key);
+			continue;
+		}
 
-		dot_product += (doc_word_tfidf * centroid_word_tfidf) * 1.0;
+		float centroid_word_tfidf = *(float *) get__hashmap(doc, key, 0);
+
+		dot_product += (doc_word_tfidf * centroid_word_tfidf);
 	}
+
+	free(centroid_key);
+	free(centroid_key_len);
 
 	// use each document magnitude to get the final similarity value
 	float similarity = dot_product / (doc_sqrt_mag * centroid_sqrt_mag);
@@ -61,7 +74,12 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 
 	float *mean_shifts;
 	
-	while(has_changed(mean_shifts, k, cluster_threshold)) {
+	do {
+		// reset clusters:
+		for (int cluster_reset = 0; cluster_reset < k; cluster_reset++) {
+			cluster[cluster_reset]->doc_pos_index = 0;
+		}
+
 		// go through non-centroid documents and assign them to centroids
 		for (int find_doc_centroid = 0; find_doc_centroid < doc_len; find_doc_centroid++) {
 
@@ -94,7 +112,7 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		if (mean_shifts)
 			free(mean_shifts);
 		mean_shifts = centroid_mean_calculate(cluster, k, doc);
-	}
+	} while(has_changed(mean_shifts, k, cluster_threshold));
 
 	return cluster;
 }
@@ -150,14 +168,18 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 	char **m2_words = (char **) keys__hashmap(m2, m2_value_len);
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
+
 		float *m1_new_value = malloc(sizeof(float));
 		void *test = get__hashmap(m2, m2_words[cp_value], 0);
 
-		*m1_new_value = *(int *) test * 1.0;
+		if (!test) {
+			printf("UH OH %s\n", m2_words[cp_value]);
+			continue;
+		}
 
-		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", NULL, NULL);
+		*m1_new_value = *(float *) test;
 
-		free(m2_words[cp_value]);
+		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", compareCharKey, NULL);
 	}
 
 	free(m2_value_len);

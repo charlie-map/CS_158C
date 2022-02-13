@@ -168,7 +168,7 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index) {
 	while(ll_node) {
 		// also check to make sure the key has a value
-		if (!ll_node->ll_meat) {
+		if (!ll_node->ll_meat || !ll_node->key.key) {
 			ll_node = ll_node->next;
 			continue;
 		}
@@ -273,6 +273,21 @@ void *get__hashmap(hashmap *hash__m, void *key, int flag) {
 	}
 
 	// no key found
+	return NULL;
+}
+
+void *getKey__hashmap(hashmap *hash__m, void *key) {
+	int mapPos = hash(key) % hash__m->hashmap__size;
+
+	ll_main_t *ll_search = hash__m->map[mapPos];
+
+	while (ll_search) {
+		if (ll_search->key.compareKey(ll_search->key.key, key)) // found a match
+			return ll_search->key.key;
+
+		ll_search = ll_next(ll_search);
+	}
+
 	return NULL;
 }
 

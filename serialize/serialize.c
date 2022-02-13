@@ -357,7 +357,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 	hashmap_body_t **doc = malloc(sizeof(hashmap_body_t *) * word_bag_len_max);
 
 	// for each doc in word_bag_len get the tf-idf of each word:
-	for (int doc_index = 0; doc_index < 1; doc_index++) {
+	for (int doc_index = 0; doc_index < word_bag_len_max; doc_index++) {
 		char *word_bag = malloc(sizeof(char) * (word_bag_len[doc_index] + 1));
 
 		// read the contents into word_bag
