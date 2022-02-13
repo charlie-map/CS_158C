@@ -19,5 +19,6 @@ void destroy_hashmap_body(hashmap_body_t *body_hash);
 hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_bag_len_max, int dtf_drop_threshold);
 
 void destroy_hashmap_val(void *ptr);
+void destroy_hashmap_float(void *v);
 
 #endif
