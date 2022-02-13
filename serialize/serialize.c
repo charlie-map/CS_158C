@@ -227,7 +227,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	free(token_page_data);
 
 	// create hashmap representation:
-	hashmap *word_freq_hash = make__hashmap(0, NULL, NULL);
+	hashmap *word_freq_hash = make__hashmap(0, NULL, destroy_hashmap_float);
 
 	int sum_of_squares = 0; // calculate sum of squares
 
@@ -247,8 +247,11 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		full_page_data[add_hash][phrase_len[add_hash]] = 0;
 
 		// get from word_freq_hash:
+		// get char * from idf and free full_page_data
+		char *freq_key = getKey__hashmap(idf_hash, full_page_data[add_hash]);
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash], 0);
-		idf_t *idf = get__hashmap(idf_hash, full_page_data[add_hash], 0);
+		idf_t *idf;
+		idf = freq_key ? get__hashmap(idf_hash, full_page_data[add_hash], 0) : NULL;
 
 		if (hashmap_freq) {
 			free(full_page_data[add_hash]);
@@ -264,6 +267,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 		// check prev_idf_ID to make sure it doesn't match current index
 		if (idf && strcmp(idf->prev_idf_ID, ID) == 0) { // skip (duplicate)
+			free(full_page_data[add_hash]);
 			continue;
 		} else if (idf) { // add to current frequency
 			idf->document_freq++;

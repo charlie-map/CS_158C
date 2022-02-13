@@ -288,6 +288,11 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 
 	curr_bytes_recv += recv(socket->sock, header_read, header_len, 0);
 
+	if (curr_bytes_recv == 0) {// missing data -- socket closed
+		free(header_read);
+		return NULL;
+	}
+
 	// read header
 	int *header_end = malloc(sizeof(int));
 	hashmap *headers = read_headers(header_read, header_end);

@@ -48,8 +48,21 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 int copy__hashmap(hashmap *m1, hashmap *m2);
 
-float *centroid_mean_calculate(cluster_t **centroids, int k, hashmap_body_t **doc);
+float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap_body_t **doc);
 int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold);
+
+int destroy_cluster(cluster_t **cluster, int k) {
+	for (int del_cluster = 0; del_cluster < k; del_cluster++) {
+		free(cluster[del_cluster]->doc_pos);
+
+		deepdestroy__hashmap(cluster[del_cluster]->centroid);
+		free(cluster[del_cluster]);
+	}
+
+	free(cluster);
+
+	return 0;
+}
 
 cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int cluster_threshold) {
 	// will choose the first k documents as centroids :D
@@ -114,7 +127,7 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		}
 
 		// calculate new averages ([k]means) for each centroid
-		mean_shifts = centroid_mean_calculate(cluster, k, doc);
+		centroid_mean_calculate(cluster, mean_shifts, k, doc);
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
 
 	return cluster;
@@ -130,9 +143,7 @@ int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshol
 	return 0;
 }
 
-float *centroid_mean_calculate(cluster_t **centroids, int k, hashmap_body_t **doc) {
-	float *mean_shift = malloc(sizeof(float) * k); // calculate the shifting amount per doc
-
+float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap_body_t **doc) {
 	// for each centroid
 	for (int find_mean_centroid = 0; find_mean_centroid < k; find_mean_centroid++) {
 		mean_shift[find_mean_centroid] = 0;

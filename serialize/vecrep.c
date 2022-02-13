@@ -15,6 +15,7 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
+#define K 4
 #define DTF_THRESHOLD 0
 #define CLUSTER_THRESHOLD 2
 
@@ -71,6 +72,17 @@ int main() {
 	for (int print_array = 0; print_array < *array_length; print_array++) {
 		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
+
+		if (!wiki_page) { // socket close!
+			// reset socket:
+
+			destroy_socket(sock_data);
+			sock_data = get_socket(HOST, PORT);
+
+			// repeat data collection
+			print_array--;
+			continue;
+		}
 
 		// parse the wiki data and write to the bag of words
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
@@ -133,15 +145,17 @@ int main() {
 	fclose(old_reader);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 4, CLUSTER_THRESHOLD);
+	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, K, CLUSTER_THRESHOLD);
 
-	for (int check_cluster = 0; check_cluster < 4; check_cluster++) {
+	for (int check_cluster = 0; check_cluster < K; check_cluster++) {
 		printf("-----Check docs on %d-----\n", check_cluster + 1);
 
 		for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
 			printf("ID: %s\n", feature_space[cluster[check_cluster]->doc_pos[read_cluster_doc]]->id);
 		}
 	}
+
+	destroy_cluster(cluster, K);
 
 	// free data:
 	for (int f_feature_space = 0; f_feature_space < index_doc_bag; f_feature_space++) {

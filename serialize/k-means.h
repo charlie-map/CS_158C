@@ -13,6 +13,8 @@ typedef struct Cluster {
 	hashmap *centroid;
 } cluster_t;
 
+int destroy_cluster(cluster_t **cluster, int k);
+
 cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int cluster_threshold);
 
 #endif
