@@ -68,7 +68,7 @@ int main() {
 
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	// loop pages and pull
-	for (int print_array = 0; print_array < 5; print_array++) {
+	for (int print_array = 0; print_array < 10; print_array++) {
 		printf("id: %s\n", array_body[print_array]);
 		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
@@ -133,9 +133,9 @@ int main() {
 	fclose(old_reader);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 2, CLUSTER_THRESHOLD);
+	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, 3, CLUSTER_THRESHOLD);
 
-	for (int check_cluster = 0; check_cluster < 2; check_cluster++) {
+	for (int check_cluster = 0; check_cluster < 3; check_cluster++) {
 		printf("-----Check docs on %d-----\n", check_cluster + 1);
 
 		for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {

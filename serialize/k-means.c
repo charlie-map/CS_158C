@@ -17,7 +17,6 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 	for (int calc_dp = 0; calc_dp < *centroid_key_len; calc_dp++) {
 		// grab value from each map
 		char *key = centroid_key[calc_dp];
-		printf("key: %s\n", key);
 
 		void *pre_doc_word_tfidf = get__hashmap(centroid, key, 0);
 		if (!pre_doc_word_tfidf) { // insert into centroid with new data
@@ -50,7 +49,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 int copy__hashmap(hashmap *m1, hashmap *m2);
 
 float *centroid_mean_calculate(cluster_t **centroids, int k, hashmap_body_t **doc);
-int has_changed(float *mean_shift, int k, float threshold);
+int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold);
 
 cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int cluster_threshold) {
 	// will choose the first k documents as centroids :D
@@ -72,12 +71,18 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		cluster[create_centroid]->centroid = new_centroid;
 	}
 
-	float *mean_shifts;
+	float *mean_shifts = malloc(sizeof(float) * k);
+	float *prev_mean_shifts = malloc(sizeof(float) * k);
+	// fill mean_shifts with 0's initially
+	memset(mean_shifts, 0, sizeof(float) * k);
+	memset(prev_mean_shifts, 0, sizeof(float) * k);
 	
 	do {
-		// reset clusters:
+		printf("RUNNING\n");
+		// reset clusters and prev_mean_shifts:
 		for (int cluster_reset = 0; cluster_reset < k; cluster_reset++) {
 			cluster[cluster_reset]->doc_pos_index = 0;
+			prev_mean_shifts[cluster_reset] = mean_shifts[cluster_reset];
 		}
 
 		// go through non-centroid documents and assign them to centroids
@@ -109,17 +114,16 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		}
 
 		// calculate new averages ([k]means) for each centroid
-		if (mean_shifts)
-			free(mean_shifts);
 		mean_shifts = centroid_mean_calculate(cluster, k, doc);
-	} while(has_changed(mean_shifts, k, cluster_threshold));
+	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
 
 	return cluster;
 }
 
-int has_changed(float *mean_shift, int k, float threshold) {
+int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold) {
 	for (int check_mean = 0; check_mean < k; check_mean++) {
-		if (mean_shift[check_mean] > threshold)
+		float diff = mean_shift[check_mean] - prev_mean_shift[check_mean];
+		if ((diff > 0 && diff > threshold) || (diff < 0 && diff * -1 > threshold))
 			return 1;
 	}
 
