@@ -44,8 +44,14 @@ int main() {
 	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
 
 	// create write stream:
-	FILE *index_writer = fopen("predocbags.txt", "r");
+	FILE *index_writer = fopen("predocbags.txt", "w");
 	FILE *title_writer = fopen("title.txt", "w");
+
+	if (!index_writer || !title_writer) {
+		printf("File loading for index or title file didn't work! Try again\n");
+		exit(1);
+	}
+
 	socket_t *sock_data = get_socket(HOST, PORT);
 
 	// calculate idf for each term
@@ -90,9 +96,6 @@ int main() {
 
 		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
 
-		printf("final len: %d\n", doc_bag_length[index_doc_bag - 1]);
-		return 0;
-
 		if (doc_bag_length[index_doc_bag - 1] < 0) {
 			printf("\nWRITE ERR\n");
 			return 1;
@@ -126,6 +129,13 @@ int main() {
 	// at a time and recalculate each term frequency with the new idf value
 	FILE *old_reader = fopen("predocbags.txt", "r");
 	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
+
+	int *key_num = malloc(sizeof(int));
+	char **keys = (char **) keys__hashmap(feature_space[0]->map, key_num);
+
+	for (int check_key = 0; check_key < *key_num; check_key++) {
+		printf("%s %1.3f\n", keys[check_key], *(float *) get__hashmap(feature_space[0]->map, keys[check_key], 0));
+	}
 
 	return 0;
 

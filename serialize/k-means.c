@@ -151,14 +151,8 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 		float *m1_new_value = malloc(sizeof(float));
-		printf("copy string %s\n", m2_words[cp_value]);
 		void *test = get__hashmap(m2, m2_words[cp_value], 0);
-		
-		if (!test) {
-			printf("FREE\n");
-			free(m2_words[cp_value]);
-			continue;
-		}
+
 		*m1_new_value = *(int *) test * 1.0;
 
 		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", NULL, NULL);

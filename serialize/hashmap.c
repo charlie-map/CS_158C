@@ -167,6 +167,12 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 
 int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index) {
 	while(ll_node) {
+		// also check to make sure the key has a value
+		if (!ll_node->ll_meat) {
+			ll_node = ll_node->next;
+			continue;
+		}
+
 		(*keys)[key_index++] = ll_node->key.key;
 
 		if (key_index == *max_key) { // resize
@@ -229,14 +235,14 @@ void *get__hashmap(hashmap *hash__m, void *key, int flag) {
 
 			hashmap__response *returnMeat;
 
-			if (flag == 1 || hash__m->hash__type) {
+			if (flag || hash__m->hash__type) {
 				returnMeat = malloc(sizeof(hashmap__response));
 				returnMeat->key = ll_search->key.key;
 			}
 			// depending on the type and mode, this will just return
 			// the value:
 			if (hash__m->hash__type == 0) {
-				if (flag == 1) {
+				if (flag) {
 					returnMeat->payload = ll_search->ll_meat;
 					returnMeat->payload__length = 1;
 				} else

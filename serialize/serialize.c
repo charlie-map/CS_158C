@@ -283,7 +283,9 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
 
 	// setup index file:
-	fputs(ID, index_fp);
+	int check = fputs(ID, index_fp);
+
+	if (check == -1) return -1;
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
 		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums], 0);
@@ -294,7 +296,9 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	sprintf(sum_square_char, " %d ", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	fputs(sum_square_char, index_fp);
+	check = fputs(sum_square_char, index_fp);
+
+	if (check == -1) return -1;
 
 	free(sum_square_char);
 
@@ -310,8 +314,10 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		// add length of key_freq_str to bag_size:
 		total_bag_size += strlen(key_freq_str);
 
-		fputs(keys[write_key], index_fp);
-		fputs(key_freq_str, index_fp);
+		check = fputs(keys[write_key], index_fp);
+		if (check == -1) return -1;
+		check = fputs(key_freq_str, index_fp);
+		if (check == -1) return -1;
 
 		free(key_freq_str);
 	}
@@ -352,7 +358,6 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 
 	// for each doc in word_bag_len get the tf-idf of each word:
 	for (int doc_index = 0; doc_index < 1; doc_index++) {
-		printf("LEN: %d\n", word_bag_len[doc_index]);
 		char *word_bag = malloc(sizeof(char) * (word_bag_len[doc_index] + 1));
 
 		// read the contents into word_bag
@@ -376,12 +381,9 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		// for each word:freq pair:
 		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
 			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc], 1);
-			printf("try get word: %s\n", word_bag_words[check_doc]);
-			printf("%s: %d\n", word_bag_words[check_doc], ((idf_t *) word_dtf->payload)->document_freq);
 			free(word_bag_words[check_doc]);
 
 			if (((idf_t *) word_dtf->payload)->document_freq < dtf_drop_threshold) {
-				printf("drop\n");
 				free(word_bag_words[check_doc + 1]);
 
 				continue;
@@ -398,7 +400,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 				continue;
 			}
 
-			insert__hashmap(new_map->map, word_dtf->key, term_freq, "", compareFloatKey, NULL);
+			insert__hashmap(new_map->map, word_dtf->key, term_freq, "", compareCharKey, NULL);
 
 			destroy__hashmap_response(word_dtf);
 		}
