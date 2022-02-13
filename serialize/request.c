@@ -291,7 +291,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	// read header
 	int *header_end = malloc(sizeof(int));
 	hashmap *headers = read_headers(header_read, header_end);
-	int content_length = atoi(get__hashmap(headers, "Content-Length"));
+	int content_length = atoi(get__hashmap(headers, "Content-Length", 0));
 
 	size_t full_req_len = sizeof(char) * content_length;
 	char *buffer = malloc(full_req_len + sizeof(char));

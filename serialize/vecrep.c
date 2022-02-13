@@ -14,7 +14,7 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
-#define DTF_THRESHOLD 3
+#define DTF_THRESHOLD 1
 
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
@@ -28,11 +28,9 @@ trie_t *fill_stopwords(char *stop_word_file) {
 
 	size_t word_len = 16 * sizeof(char);
 	char *word = malloc(word_len);
-	while (getline(&word, &word_len, stop_fp) != -1) {
-		printf("%s\n", word);
+	while (getline(&word, &word_len, stop_fp) != -1)
 		trie_insert(trie, word);
-	}
-
+	
 	free(word);
 	fclose(stop_fp);
 
@@ -122,9 +120,22 @@ int main() {
 	// we can go back through the writer again and pull each document out one
 	// at a time and recalculate each term frequency with the new idf value
 	FILE *old_reader = fopen("predocbags.txt", "r");
-	word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
+	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
 
 	fclose(old_reader);
+
+	// start k-means to calculate clusters
+
+
+	// free data:
+	for (int f_feature_space = 0; f_feature_space < index_doc_bag; f_feature_space++) {
+		destroy_hashmap_body(feature_space[f_feature_space]);
+	}
+
+	free(feature_space);
+	free(doc_bag_length);
+
+	deepdestroy__hashmap(idf);
 
 	return 0;
 }

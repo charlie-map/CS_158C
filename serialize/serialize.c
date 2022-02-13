@@ -7,7 +7,7 @@
 #include "../stemmer.h"
 
 struct IDF_Track {
-	int prev_idf_index; // last document to be added (for checking dupes)
+	char *prev_idf_ID; // last document to be added (for checking dupes)
 	int document_freq; // occurrences of documents that contain term
 };
 
@@ -59,7 +59,6 @@ int delimeter_check(char curr_char, char *delims) {
 	}
 
 	int num_is_range(char _char) {
-		printf("num range: %c %d\n", _char, (int) _char);
 		return (((int) _char >= 65 && (int) _char <= 90) ||
 			((int) _char >= 97 && (int) _char <= 122) ||
 			((int) _char >= 48 && (int) _char <= 57));
@@ -174,7 +173,7 @@ void destroy_hashmap_val(void *ptr) {
 }
 
 void *is_block(void *hmap, char *tag) {
-	return get__hashmap((hashmap *) hmap, tag);
+	return get__hashmap((hashmap *) hmap, tag, 0);
 }
 
 int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash) {
@@ -247,8 +246,8 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		full_page_data[add_hash][phrase_len[add_hash]] = 0;
 
 		// get from word_freq_hash:
-		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash]);
-		idf_t *idf = get__hashmap(idf_hash, full_page_data[add_hash]);
+		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash], 0);
+		idf_t *idf = get__hashmap(idf_hash, full_page_data[add_hash], 0);
 
 		if (hashmap_freq) {
 			free(full_page_data[add_hash]);
@@ -262,17 +261,16 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		*hashmap_freq = 1;
 
 		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
-
-		// check prev_idf_index to make sure it doesn't match current index
-		if (idf && idf->prev_idf_index == add_hash) // skip (duplicate)
+		// check prev_idf_ID to make sure it doesn't match current index
+		if (idf && strcmp(idf->prev_idf_ID, ID) == 0) { // skip (duplicate)
 			continue;
-		else if (idf) { // add to current frequency
+		} else if (idf) { // add to current frequency
 			idf->document_freq++;
-			idf->prev_idf_index = add_hash;
+			idf->prev_idf_ID = ID;
 		} else {
 			idf = malloc(sizeof(idf_t));
 			idf->document_freq = 1;
-			idf->prev_idf_index = add_hash;
+			idf->prev_idf_ID = ID;
 			insert__hashmap(idf_hash, full_page_data[add_hash], idf, "", compareCharKey, NULL);
 		}
 	}
@@ -287,7 +285,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	fputs(ID, index_fp);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
-		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums]);
+		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums], 0);
 		sum_of_squares += key_freq * key_freq;
 	}
 	char *sum_square_char = malloc(sizeof(char) * 13);
@@ -301,7 +299,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	// loop through keys and input word:freq pairs
 	for (int write_key = 0; write_key < *key_len; write_key++) {
-		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key]);
+		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key], 0);
 
 		char *key_freq_str = malloc(sizeof(char) * 13);
 		memset(key_freq_str, '\0', sizeof(char) * 13);
@@ -331,11 +329,11 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	return total_bag_size;
 }
 
-typedef struct HashmapBody {
+struct HashmapBody {
 	char *id;
 	char *mag;
 	hashmap *map;
-} hashmap_body_t;
+};
 
 void destroy_hashmap_float(void *v) {
 	free((float *) v);
@@ -347,20 +345,33 @@ int compareFloatKey(void *v1, void *v2) {
 	return *(float *) v1 < *(float *) v2;
 }
 
-int word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_bag_len_max, int dtf_drop_threshold) {
+void destroy_hashmap_body(hashmap_body_t *body_hash) {
+	free(body_hash->id);
+	free(body_hash->mag);
+
+	deepdestroy__hashmap(body_hash->map);
+
+	free(body_hash);
+	return;
+}
+
+hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_bag_len_max, int dtf_drop_threshold) {
 	hashmap_body_t **doc = malloc(sizeof(hashmap_body_t *) * word_bag_len_max);
 
 	// for each doc in word_bag_len get the tf-idf of each word:
 	for (int doc_index = 0; doc_index < 1; doc_index++) {
-		char *word_bag = malloc(sizeof(char) * word_bag_len[doc_index]);
+		char *word_bag = malloc(sizeof(char) * (word_bag_len[doc_index] + 1));
 
 		// read the contents into word_bag
 		fread(word_bag, sizeof(char), word_bag_len[doc_index], index_reader);
+		word_bag[word_bag_len[doc_index]++] = '\0';
 
 		// splice word_bag by multi_delimeters:
 		// use " " and ":" as delimeters
 		int *word_bag_words_max = malloc(sizeof(int));
 		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
+
+		free(word_bag);
 
 		hashmap_body_t *new_map = malloc(sizeof(hashmap_body_t));
 
@@ -370,25 +381,36 @@ int word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_len, int word_b
 
 		// for each word:freq pair:
 		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
-			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc]);
+			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc], 1);
 			free(word_bag_words[check_doc]);
 
-			if (*(float *) word_dtf->payload < dtf_drop_threshold) {
+			if (((idf_t *) word_dtf->payload)->document_freq < dtf_drop_threshold) {
 				free(word_bag_words[check_doc + 1]);
 
 				continue;
 			}
 
 			float *term_freq = malloc(sizeof(float));
-			*term_freq = (float) atoi(word_bag_words[check_doc + 1]) / *(float *) word_dtf->payload;
+			*term_freq = (float) atoi(word_bag_words[check_doc + 1]) / (float) ((idf_t *) word_dtf->payload)->document_freq;
 			free(word_bag_words[check_doc + 1]);
 
-			printf("feature %s strength: %1.3f\n", word_dtf->key, *term_freq);
+			// check for high enough tf-idf:
+			if (*term_freq < 1.1) { // skip
+				free(term_freq);
+				destroy__hashmap_response(word_dtf);
+				continue;
+			}
+
 			insert__hashmap(new_map->map, word_dtf->key, term_freq, "", compareFloatKey, NULL);
+
+			destroy__hashmap_response(word_dtf);
 		}
+
+		free(word_bag_words_max);
+		free(word_bag_words);
 
 		doc[doc_index] = new_map;
 	}
 
-	return 0;
+	return doc;
 }

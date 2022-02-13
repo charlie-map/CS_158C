@@ -155,11 +155,11 @@ trie_t *trie_create(char *param, ...) {
 
 int trie_insert_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) {
 	char *build_alloc_char = trie_meta_data->payload_type ? singleton_maker(value) : NULL;
-	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value);
+	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, 0);
 
 	void *get_next_value = trie_meta_data->next(value);
 
-	if (get_next_value && sub_node) {
+	if (get_next_value && sub_node) {		
 		if (build_alloc_char)
 			free(build_alloc_char);
 
@@ -187,7 +187,7 @@ int trie_insert(trie_t *trie, void *p_value) {
 
 int trie_search_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) {
 	char *build_alloc_char = trie_meta_data->payload_type ? singleton_maker(value) : NULL;
-	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value);
+	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, 0);
 
 	void *get_next_value = trie_meta_data->next(value);
 

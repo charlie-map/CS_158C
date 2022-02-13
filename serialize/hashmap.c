@@ -214,8 +214,11 @@ void **keys__hashmap(hashmap *hash__m, int *max_key) {
 			free()ing of this array will leave the key to that array
 			pointing to unknown memory. However, the freeing of the
 			returned struct will be left to the user
+	-- flag:
+		0: normal behavior
+		1: return map key as well
 */
-void *get__hashmap(hashmap *hash__m, void *key) {
+void *get__hashmap(hashmap *hash__m, void *key, int flag) {
 	// get hash position
 	int mapPos = hash(key) % hash__m->hashmap__size;
 
@@ -224,13 +227,20 @@ void *get__hashmap(hashmap *hash__m, void *key) {
 	while (ll_search) {
 		if (ll_search->key.compareKey(ll_search->key.key, key)) { // found a match
 
-			hashmap__response *returnMeat = malloc(sizeof(hashmap__response));
-			returnMeat->key = ll_search->key.key;
+			hashmap__response *returnMeat;
+
+			if (flag == 1 || hash__m->hash__type) {
+				returnMeat = malloc(sizeof(hashmap__response));
+				returnMeat->key = ll_search->key.key;
+			}
 			// depending on the type and mode, this will just return
 			// the value:
 			if (hash__m->hash__type == 0) {
-				returnMeat->payload = ll_search->ll_meat;
-				returnMeat->payload__length = 1;;
+				if (flag == 1) {
+					returnMeat->payload = ll_search->ll_meat;
+					returnMeat->payload__length = 1;
+				} else
+					return ll_search->ll_meat;
 			} else {
 
 				if (ll_search->isArray) {
@@ -258,6 +268,12 @@ void *get__hashmap(hashmap *hash__m, void *key) {
 
 	// no key found
 	return NULL;
+}
+
+void destroy__hashmap_response(hashmap__response *map_res) {
+	free(map_res);
+
+	return;
 }
 
 int print__hashmap(hashmap *hash__m) {
