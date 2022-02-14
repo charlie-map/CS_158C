@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include <math.h>
 
 #include "trie.h"
 #include "token.h"
@@ -60,6 +62,31 @@ typedef struct SerializeObject {
 	int end_read_body;
 } serialize_t;
 
+serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
+	socket_t **sock_data, hashmap *idf, FILE *index_writer, FILE *title_writer,
+	int *doc_bag_length, int *index_doc_bag, int start_read_body, int end_read_body) {
+
+	serialize_t *new_ser = malloc(sizeof(serialize_t));
+
+	new_ser->all_IDs = all_IDs;
+	new_ser->array_body = array_body;
+	new_ser->array_length = array_length;
+
+	new_ser->sock_data = sock_data;
+
+	new_ser->idf = idf;
+	new_ser->index_writer = index_writer;
+	new_ser->title_writer = title_writer;
+
+	new_ser->doc_bag_length = doc_bag_length;
+	new_ser->index_doc_bag = index_doc_bag;
+
+	new_ser->start_read_body = start_read_body;
+	new_ser->end_read_body = end_read_body;
+
+	return new_ser;
+}
+
 void *data_read(void *meta_ptr);
 
 int main() {
@@ -75,13 +102,14 @@ int main() {
 		exit(1);
 	}
 
-	socket_t *sock_data = get_socket(HOST, PORT);
+	socket_t **sock_data = malloc(sizeof(socket_t *));
+	*sock_data = get_socket(HOST, PORT);
 
 	// calculate idf for each term
 	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
 
 	// initial header request
-	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	res *response = send_req(*sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 
 	// pull array
 	int *array_length = malloc(sizeof(int));
@@ -99,8 +127,21 @@ int main() {
 	// create pthreads to get data faster
 	pthread_t *p_thread = malloc(sizeof(pthread_t) * THREAD_NUMBER);
 
-	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
+	// calculate diff between array_length and THREAD_NUMBER
+	// to find how many documents each thread ripper should have
+	int doc_per_thread = floor(*array_length / THREAD_NUMBER);
 
+	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
+		serializer_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data,
+			idf, index_writer, title_writer, thread_rip * doc_per_thread,
+			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
+
+		pthread_create(&p_thread[thread_rip], NULL, data_read, new_serializer);
+	}
+
+	// rejoin threads
+	for (int rejoin_thread = 0; rejoin_thread < THREAD_NUMBER; rejoin_thread++) {
+		pthread_join(p_thread[rejoin_thread], NULL);
 	}
 
 	free(array_body);
@@ -170,15 +211,34 @@ int main() {
 		-- int end_read_body
 */
 void *data_read(void *meta_ptr) {
-	for (int read_body = 0; read_body < *array_length; read_body++) {
+	serialize_t *ser_pt = (serialize_t *) meta_ptr;
+
+	// redeclare each component of ser_pt as single variable for ease of comprehensibility
+	char **all_IDs = ser_pt->all_IDs;
+	char **array_body = ser_pt->array_body;
+	int *array_length = ser_pt->array_length;
+
+	socket_t **sock_data = ser_pt->sock_data;
+
+	hashmap *idf = ser_pt->idf;
+	FILE *index_writer = ser_pt->index_writer;
+	FILE *title_writer = ser_pt->title_writer;
+
+	int *doc_bag_length = ser_pt->doc_bag_length;
+	int *index_doc_bag = ser_pt->index_doc_bag;
+
+	int start_read_body = ser_pt->start_read_body;
+	int end_read_body = ser_pt->end_read_body;
+
+	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
 		printf("id: %s\n", array_body[read_body]);
-		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
+		res *wiki_page = send_req(*sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
 
 		if (!wiki_page) { // socket close!
 			// reset socket:
 
-			destroy_socket(sock_data);
-			sock_data = get_socket(HOST, PORT);
+			destroy_socket(*sock_data);
+			*sock_data = get_socket(HOST, PORT);
 
 			// repeat data collection
 			read_body--;
