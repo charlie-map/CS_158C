@@ -177,6 +177,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 		}
 
 		free(cluster_word_len);
+		free(cluster_word);
 	}
 
 	return mean_shift;

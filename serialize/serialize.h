@@ -8,7 +8,7 @@
 typedef struct IDF_Track idf_t;
 void hashmap_destroy_idf(void *p);
 
-int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf);
+int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf, char **ID);
 
 typedef struct HashmapBody {
 	char *id;

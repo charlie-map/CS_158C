@@ -67,6 +67,7 @@ int main() {
 	int *array_length = malloc(sizeof(int));
 	char **array_body = handle_array(res_body(response), array_length);
 
+	char **all_IDs = malloc(sizeof(char *) * *array_length);
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	// loop pages and pull
 	for (int print_array = 0; print_array < *array_length; print_array++) {
@@ -106,7 +107,7 @@ int main() {
 			free(new_title);
 		}
 
-		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf);
+		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[print_array]);
 
 		if (doc_bag_length[index_doc_bag - 1] < 0) {
 			printf("\nWRITE ERR\n");
@@ -159,11 +160,14 @@ int main() {
 
 	// free data:
 	for (int f_feature_space = 0; f_feature_space < index_doc_bag; f_feature_space++) {
+		free(all_IDs[f_feature_space]);
 		destroy_hashmap_body(feature_space[f_feature_space]);
 	}
 
 	free(feature_space);
 	free(doc_bag_length);
+
+	free(all_IDs);
 
 	deepdestroy__hashmap(idf);
 

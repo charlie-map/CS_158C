@@ -177,27 +177,27 @@ void *is_block(void *hmap, char *tag) {
 	return get__hashmap((hashmap *) hmap, tag, 0);
 }
 
-int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash) {
+int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash, char **ID) {
 	int total_bag_size = 0;
 
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
-	char *ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
 	total_bag_size += *ID_len - 1;
+	free(ID_len);
 
 	// get title
 	int *title_len = malloc(sizeof(int));
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
 
 	// write to title_fp
-	fputs(ID, title_fp);
+	fputs(*ID, title_fp);
 	fputs(":", title_fp);
 	fputs(title, title_fp);
 	fputs("\n", title_fp);
 
-	free(ID_len);
 	free(title_len);
 	free(title);
 
@@ -264,20 +264,22 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		hashmap_freq = malloc(sizeof(int));
 		*hashmap_freq = 1;
 
-		insert__hashmap(word_freq_hash, full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
+		insert__hashmap(word_freq_hash, freq_key ? freq_key : full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 		// check prev_idf_ID to make sure it doesn't match current index
-		if (idf && strcmp(idf->prev_idf_ID, ID) == 0) { // skip (duplicate)
-			free(full_page_data[add_hash]);
+		if (idf && strcmp(idf->prev_idf_ID, *ID) == 0) { // skip (duplicate)
 			continue;
 		} else if (idf) { // add to current frequency
 			idf->document_freq++;
-			idf->prev_idf_ID = ID;
+			idf->prev_idf_ID = *ID;
 		} else {
 			idf = malloc(sizeof(idf_t));
 			idf->document_freq = 1;
-			idf->prev_idf_ID = ID;
-			insert__hashmap(idf_hash, full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
+			idf->prev_idf_ID = *ID;
+			insert__hashmap(idf_hash, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
 		}
+
+		if (freq_key)
+			free(full_page_data[add_hash]);
 	}
 
 	free(word_number_max);
@@ -287,7 +289,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
 
 	// setup index file:
-	int check = fputs(ID, index_fp);
+	int check = fputs(*ID, index_fp);
 
 	if (check == -1) return -1;
 
@@ -379,6 +381,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 
 		new_map->id = word_bag_words[0];
 		new_map->mag = atoi(word_bag_words[1]) * 1.0;
+		free(word_bag_words[1]);
 		new_map->sqrt_mag = sqrt(new_map->mag);
 		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
