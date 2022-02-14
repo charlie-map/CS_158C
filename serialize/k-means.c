@@ -130,6 +130,9 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		centroid_mean_calculate(cluster, mean_shifts, k, doc);
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
 
+	free(mean_shifts);
+	free(prev_mean_shifts);
+
 	return cluster;
 }
 
@@ -172,6 +175,8 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 			float tfidf_diff = (*centroid_tfidf) - prev_centroid_tfidf;
 			mean_shift[find_mean_centroid] += tfidf_diff * tfidf_diff;
 		}
+
+		free(cluster_word_len);
 	}
 
 	return mean_shift;
