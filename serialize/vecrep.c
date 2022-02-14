@@ -15,6 +15,8 @@
 #define REQ_NAME "permission_data_pull"
 #define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
 
+#define THREAD_NUMBER 8
+
 #define K 4
 #define DTF_THRESHOLD 0
 #define CLUSTER_THRESHOLD 2
@@ -40,6 +42,26 @@ trie_t *fill_stopwords(char *stop_word_file) {
 	return trie;
 }
 
+typedef struct SerializeObject {
+	char **all_IDs;
+	char **array_body;
+	int *array_length;
+
+	socket_t **sock_data;
+
+	hashmap *idf;
+	FILE *index_writer;
+	FILE *title_writer;
+
+	int *doc_bag_length;
+	int *index_doc_bag;
+
+	int start_read_body;
+	int end_read_body;
+} serialize_t;
+
+void *data_read(void *meta_ptr);
+
 int main() {
 	// create stopword structure
 	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
@@ -57,8 +79,6 @@ int main() {
 
 	// calculate idf for each term
 	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
-	int *doc_bag_length = malloc(sizeof(int) * 8);
-	int doc_bag_length_max = 8, index_doc_bag = 0;
 
 	// initial header request
 	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
@@ -67,63 +87,20 @@ int main() {
 	int *array_length = malloc(sizeof(int));
 	char **array_body = handle_array(res_body(response), array_length);
 
+	// each document length (in serialized form)
+	int *doc_bag_length = malloc(sizeof(int) * *array_length);
+	int *index_doc_bag = malloc(sizeof(int)); // pointer to current position in doc_bag_length
+	*index_doc_bag = 0;
+
 	char **all_IDs = malloc(sizeof(char *) * *array_length);
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
 	// loop pages and pull
-	for (int print_array = 0; print_array < *array_length; print_array++) {
-		printf("id: %s\n", array_body[print_array]);
-		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[print_array]);
 
-		if (!wiki_page) { // socket close!
-			// reset socket:
+	// create pthreads to get data faster
+	pthread_t *p_thread = malloc(sizeof(pthread_t) * THREAD_NUMBER);
 
-			destroy_socket(sock_data);
-			sock_data = get_socket(HOST, PORT);
+	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
 
-			// repeat data collection
-			print_array--;
-			continue;
-		}
-
-		// parse the wiki data and write to the bag of words
-		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
-
-		// check title for any extra components:
-		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");
-		char *curr_title_value = data_at_token(check_title_token);
-		if (!strlen(curr_title_value)) {
-			// check for a child:
-			int *title_max_length = malloc(sizeof(int));
-			char *new_title = token_read_all_data(check_title_token, title_max_length, NULL, NULL);
-
-			if (strlen(new_title)) // add it!
-				update_token_data(check_title_token, new_title, title_max_length);
-			else {// bad data
-				printf("An error occured with the title of document: %d\n", print_array);
-				exit(1);
-			}
-
-			free(title_max_length);
-			free(new_title);
-		}
-
-		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[print_array]);
-
-		if (doc_bag_length[index_doc_bag - 1] < 0) {
-			printf("\nWRITE ERR\n");
-			return 1;
-		}
-
-		// check resize:
-		if (index_doc_bag == doc_bag_length_max) {
-			doc_bag_length_max *= 2;
-			doc_bag_length = realloc(doc_bag_length, sizeof(int) * doc_bag_length_max);
-		}
-
-		destroy_token(new_wiki_page_token);
-		res_destroy(wiki_page);
-
-		free(array_body[print_array]);
 	}
 
 	free(array_body);
@@ -172,4 +149,76 @@ int main() {
 	deepdestroy__hashmap(idf);
 
 	return 0;
+}
+
+/*
+	META_PTR:
+		-- char **all_IDs
+		-- char **array_body
+		-- int *array_length
+
+		-- socket_t **sock_data (requires mutex locking)
+
+		-- hashmap *idf (requires mutex locking)
+		-- FILE *index_writer (requires mutex locking)
+		-- FILE *title_writer (requires mutex locking)
+
+		-- int *doc_bag_length
+		-- int *index_doc_bag (requires mutex locking)
+
+		-- int start_read_body
+		-- int end_read_body
+*/
+void *data_read(void *meta_ptr) {
+	for (int read_body = 0; read_body < *array_length; read_body++) {
+		printf("id: %s\n", array_body[read_body]);
+		res *wiki_page = send_req(sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
+
+		if (!wiki_page) { // socket close!
+			// reset socket:
+
+			destroy_socket(sock_data);
+			sock_data = get_socket(HOST, PORT);
+
+			// repeat data collection
+			read_body--;
+			continue;
+		}
+
+		// parse the wiki data and write to the bag of words
+		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
+
+		// check title for any extra components:
+		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");
+		char *curr_title_value = data_at_token(check_title_token);
+		if (!strlen(curr_title_value)) {
+			// check for a child:
+			int *title_max_length = malloc(sizeof(int));
+			char *new_title = token_read_all_data(check_title_token, title_max_length, NULL, NULL);
+
+			if (strlen(new_title)) // add it!
+				update_token_data(check_title_token, new_title, title_max_length);
+			else {// bad data
+				printf("An error occured with the title of document: %d\n", read_body);
+				exit(1);
+			}
+
+			free(title_max_length);
+			free(new_title);
+		}
+
+		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[read_body]);
+
+		if (doc_bag_length[index_doc_bag - 1] < 0) {
+			printf("\nWRITE ERR\n");
+			exit(1);
+		}
+
+		destroy_token(new_wiki_page_token);
+		res_destroy(wiki_page);
+
+		free(array_body[read_body]);
+	}
+
+	return NULL;
 }
