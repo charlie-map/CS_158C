@@ -71,7 +71,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 This will write to an index file (`index_fp`) in the format:
 ```
-id: word:frequency word:frequency word:frequency etc.
+id magnitude word:frequency word:frequency word:frequency etc.
 ```
 and for the title index (`title_fp`) in the format:
 ```
@@ -80,13 +80,48 @@ id: title
 - Other ideas for serialization? Add an issue to this repository.
 
 # Deserialize Index
-#### _Coming Soon_
+Deserialize quickly pulls all the documents from the serialized form and places them each in a separate hashmap. This is possible because instead of creating a new `char *` for each word, the same `char *` used for `idf` is used for each occurence of the word in any document, which dramatically improves space complexity.
 
 # Query Index
 #### _Coming Soon_
 
 # Classify Document
-#### _Coming Soon_
+Classify currently creates `K` (based on input) centroids and each document will try to attach to a singular centroid. The centroids continue trying to "move" towards the center of their clusters (mean-finding) until little enough has changed that the program can stop. Currently with a run of the program with `K=4` and the first four documents are chosen as the initial cluster centroids (not actually chosen, but copied), the following results occur:
+
+- Group 1:
+  - Ball
+  - Main Page
+  - Langton's ant
+  - Chicago Fire
+  - Lacrosse
+  - Basketball
+  - Virginia Cavaliers men's basketball
+  - Virginia Cavaliers
+- Group 2:
+  - Spain
+  - Abortion debate
+  - Abortion in the United States by state
+  - Minors and abortion
+  - Potato
+  - Alan Turing
+  - Ancient Rome
+  - Great Chicago Fire
+  - Marsden Rock
+  - Wiki
+  - Final Fantasy XIII-2
+  - Apple Inc.
+- Group 3:
+  - Europe
+  - Nicholas II of Russia
+  - Ancient Greece
+  - Tree Frog
+- Group 4:
+  - Greater Caucasus
+ 
+ Noticably, there is a large weighting towards Group 2 for any "random" documents. This is likely dude to the choice of Spain as the start document; that document contains many thousands of words, and therefore will have some higher weighting since the reach of the words spreads very far, from `Final Fantasy XIII-2` to `Marsden Rock`.
+ 
+ ### Future Updates and Enhancements:
+ The addition of multiple K-means with different start centroids occuring at the same time concurrently (through the use of `pthread`s). This will then allow a weighting to occur on each of the returned K-mean groups to then choose the "best" one.
 
 # Notes
   1. _This function currently is not used outside the scope of the internal project. Add comments for possible additions_
