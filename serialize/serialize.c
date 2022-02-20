@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "serialize.h"
 #include "../stemmer.h"
@@ -177,7 +178,11 @@ void *is_block(void *hmap, char *tag) {
 	return get__hashmap((hashmap *) hmap, tag, 0);
 }
 
-int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash, char **ID) {
+/* Update to wordbag:
+	Now index_fp, title_fp, and idf_hash need mutex locking,
+	so bring mutex attr with them
+*/
+int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t idf_hash, char **ID) {
 	int total_bag_size = 0;
 
 	// create title page:

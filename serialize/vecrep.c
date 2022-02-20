@@ -51,12 +51,12 @@ typedef struct SerializeObject {
 
 	socket_t **sock_data;
 
-	hashmap *idf;
-	FILE *index_writer;
-	FILE *title_writer;
+	mutex_t idf; // hashmap *idf
+	mutex_t index_writer; // FILE *index_writer
+	mutex_t title_writer; // FILE *title_writer
 
-	int *doc_bag_length;
-	int *index_doc_bag;
+	mutex_t doc_bag_length; // int *doc_bag_length
+	mutex_t index_doc_bag;  // int *index_doc_bag
 
 	int start_read_body;
 	int end_read_body;
@@ -74,12 +74,13 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 
 	new_ser->sock_data = sock_data;
 
-	new_ser->idf = idf;
-	new_ser->index_writer = index_writer;
-	new_ser->title_writer = title_writer;
+	new_ser->idf = { .runner = idf, .mutex = PTHREAD_MUTEX_INITIALIZER };
 
-	new_ser->doc_bag_length = doc_bag_length;
-	new_ser->index_doc_bag = index_doc_bag;
+	new_ser->index_writer = { .runner = index_writer, .mutex = PTHREAD_MUTEX_INITIALIZER };
+	new_ser->title_writer = { .runner = title_writer, .mutex = PTHREAD_MUTEX_INITIALIZER };
+
+	new_ser->doc_bag_length = { .runner = doc_bag_length, .mutex = PTHREAD_MUTEX_INITIALIZER };
+	new_ser->index_doc_bag =  { .runner = index_doc_bag,  .mutex = PTHREAD_MUTEX_INITIALIZER };
 
 	new_ser->start_read_body = start_read_body;
 	new_ser->end_read_body = end_read_body;
@@ -198,13 +199,13 @@ int main() {
 		-- char **array_body
 		-- int *array_length
 
-		-- socket_t **sock_data (requires mutex locking)
+		-- socket_t **sock_data
 
 		-- hashmap *idf (requires mutex locking)
 		-- FILE *index_writer (requires mutex locking)
 		-- FILE *title_writer (requires mutex locking)
 
-		-- int *doc_bag_length
+		-- int *doc_bag_length (requires mutex locking)
 		-- int *index_doc_bag (requires mutex locking)
 
 		-- int start_read_body
@@ -267,7 +268,13 @@ void *data_read(void *meta_ptr) {
 			free(new_title);
 		}
 
-		doc_bag_length[index_doc_bag++] = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[read_body]);
+		int new_doc_length = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[read_body]);
+		
+		pthread_mutex_lock(&(ser_pt->doc_bag_length->mutex));
+		pthread_mutex_lock(&(ser_pt->doc_bag_length->mutex));
+		doc_bag_length[index_doc_bag++] = new_doc_length;
+		pthread_mutex_unlock(&(ser_pt->doc_bag_length->mutex));
+		pthread_mutex_unlock(&(ser_pt->doc_bag_length->mutex));
 
 		if (doc_bag_length[index_doc_bag - 1] < 0) {
 			printf("\nWRITE ERR\n");
