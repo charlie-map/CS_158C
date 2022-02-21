@@ -19,7 +19,7 @@ typedef struct SocketData {
 socket_t *get_socket(char *HOST, char *PORT);
 int destroy_socket(socket_t *socket_data);
 
-res *send_req(mutex_t sock, char *sub_url, char *type, char *param, ...);
+res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...);
 
 // res is the response body, max_len is the length of the
 // char ** returned. So an input of:

@@ -259,7 +259,8 @@ hashmap *read_headers(char *header_str, int *header_end) {
 }
 
 // takes request url and will build the full url:
-res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *type, ...) {
+res *send_req_helper(socket_t *socket, pthread_mutex_t socket_mutex, int has_mutex,
+	char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
 	if (strcmp(type, "POST") == 0) { // look for next param
 		va_list post_data;
@@ -269,12 +270,13 @@ res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *t
 	}
 
 	// build the request into the header:
-	pthread_mutex_lock(&(socket.mutex));
-	char *header = create_header(((socket_t *) socket.runner)->HOST, ((socket_t *) socket.runner)->PORT, request_url, url_length, data);
+	if (has_mutex)
+		pthread_mutex_lock(&socket_mutex);
+	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
-	while ((bytes_sent = send(((socket_t *) socket.runner)->sock, header, *url_length, 0)) < total_bytes) {
+	while ((bytes_sent = send(socket->sock, header, *url_length, 0)) < total_bytes) {
 		if (bytes_sent == -1) {
 			fprintf(stderr, "send data err: %s\n", gai_strerror(bytes_sent));
 			exit(1);
@@ -288,7 +290,7 @@ res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *t
 	char *header_read = malloc(header_len);
 	memset(header_read, '\0', header_len);
 
-	curr_bytes_recv += recv(((socket_t *) socket.runner)->sock, header_read, header_len, 0);
+	curr_bytes_recv += recv(socket->sock, header_read, header_len, 0);
 
 	if (curr_bytes_recv == 0) {// missing data -- socket closed
 		free(header_read);
@@ -312,7 +314,7 @@ res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *t
 	free(header_end);
 
 	while (buffer_bytes < full_req_len) {
-		int new_bytes = recv(((socket_t *) socket.runner)->sock, buffer + buffer_bytes, full_req_len, 0);
+		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
 
 		if (new_bytes == -1) {
 			continue;
@@ -322,7 +324,8 @@ res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *t
 	}
 
 	buffer[full_req_len] = '\0';
-	pthread_mutex_unlock(&(socket.mutex));
+	if (has_mutex)
+		pthread_mutex_unlock(&socket_mutex);
 
 	// create response structure
 	return res_create(headers, buffer, full_req_len + 1);
@@ -409,22 +412,34 @@ int spec_char_sum(char *request_structure, char search_char) {
 		does not start with a "?":
 		"name=$&passcode=$"
 		- then a char * for each $ within the body
+	- "-t" for adding a mutex locker to the socket (only needed for threading)
 	- if no params are wanted, put "" in for param
 */
-res *send_req(mutex_t sock, char *sub_url, char *type, char *param, ...) {
+res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	// parse param:
 	va_list read_multi_param;
 	va_start(read_multi_param, param);
 
 	int *url_length = malloc(sizeof(int));
-	char *new_url;
+	*url_length = 0;
+	char *new_url = NULL;
 
 	int *data_length = malloc(sizeof(int));
 	char *new_data = NULL;
 
+	pthread_mutex_t socket_mutex;
+	int has_mutex = 0;
+
 	for (int check_param = 0; param[check_param]; check_param++) {
 		if (param[check_param] != '-')
 			continue;
+
+		if (param[check_param + 1] == 't') {
+			socket_mutex = va_arg(read_multi_param, pthread_mutex_t);;
+			has_mutex = 1;
+
+			continue;
+		}
 
 		if (param[check_param + 1] != 'q' && param[check_param + 1] != 'b')
 			continue;
@@ -454,14 +469,23 @@ res *send_req(mutex_t sock, char *sub_url, char *type, char *param, ...) {
 	}
 
 	free(data_length);
+	int need_sub_url = 0;
 
-	if (*url_length == 0)
-		return NULL;
+	if (*url_length == 0) {
+		*url_length = strlen(sub_url);
+
+		if (*url_length == 0) // real bad!
+			return NULL;
+
+		need_sub_url = 1;
+	}
 
 	// if GET, sending data doesn't matter
-	res *response = send_req_helper(sock, new_url, url_length, type, new_data);
+	res *response = send_req_helper(sock, socket_mutex, has_mutex, need_sub_url ? sub_url : new_url,
+		url_length, type, new_data);
 
-	free(new_url);
+	if (new_url)
+		free(new_url);
 	free(url_length);
 
 	if (new_data)

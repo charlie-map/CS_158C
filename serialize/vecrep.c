@@ -11,11 +11,11 @@
 #include "hashmap.h"
 #include "serialize.h"
 
-#define HOST "cutewiki.charlie.city"
-#define PORT "8822"
+#define HOST getenv("WIKIREAD_HOST")
+#define PORT getenv("WIKIREAD_PORT")
 
-#define REQ_NAME "permission_data_pull"
-#define REQ_PASSCODE "d6bc639b-8235-4c0d-82ff-707f9d47a4ca"
+#define REQ_NAME getenv("WIKIREAD_REQ_NAME")
+#define REQ_PASSCODE getenv("WIKIREAD_REQ_PASSCODE")
 
 #define THREAD_NUMBER 8
 
@@ -109,7 +109,7 @@ int main() {
 	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
 
 	// initial header request
-	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	res *response = send_req(sock_data, "/pull_page_names", "POST", "-b", "name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 
 	// pull array
 	int *array_length = malloc(sizeof(int));
@@ -222,7 +222,7 @@ void *data_read(void *meta_ptr) {
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
 		printf("id #%d: %s\n", read_body, array_body[read_body]);
-		res *wiki_page = send_req(ser_pt->sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
+		res *wiki_page = send_req(ser_pt->sock_data.runner, "/pull_data", "POST", "-b-t", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE, ser_pt->sock_data.mutex);
 
 		if (!wiki_page) { // socket close!
 			// reset socket:
