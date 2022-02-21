@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 // all socket related packages
 #include <sys/types.h>
@@ -258,7 +259,7 @@ hashmap *read_headers(char *header_str, int *header_end) {
 }
 
 // takes request url and will build the full url:
-res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char *type, ...) {
+res *send_req_helper(mutex_t socket, char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
 	if (strcmp(type, "POST") == 0) { // look for next param
 		va_list post_data;
@@ -268,11 +269,12 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	}
 
 	// build the request into the header:
-	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
+	pthread_mutex_lock(&(socket.mutex));
+	char *header = create_header(((socket_t *) socket.runner)->HOST, ((socket_t *) socket.runner)->PORT, request_url, url_length, data);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
-	while ((bytes_sent = send(socket->sock, header, *url_length, 0)) < total_bytes) {
+	while ((bytes_sent = send(((socket_t *) socket.runner)->sock, header, *url_length, 0)) < total_bytes) {
 		if (bytes_sent == -1) {
 			fprintf(stderr, "send data err: %s\n", gai_strerror(bytes_sent));
 			exit(1);
@@ -286,7 +288,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	char *header_read = malloc(header_len);
 	memset(header_read, '\0', header_len);
 
-	curr_bytes_recv += recv(socket->sock, header_read, header_len, 0);
+	curr_bytes_recv += recv(((socket_t *) socket.runner)->sock, header_read, header_len, 0);
 
 	if (curr_bytes_recv == 0) {// missing data -- socket closed
 		free(header_read);
@@ -310,7 +312,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	free(header_end);
 
 	while (buffer_bytes < full_req_len) {
-		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
+		int new_bytes = recv(((socket_t *) socket.runner)->sock, buffer + buffer_bytes, full_req_len, 0);
 
 		if (new_bytes == -1) {
 			continue;
@@ -320,6 +322,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	}
 
 	buffer[full_req_len] = '\0';
+	pthread_mutex_unlock(&(socket.mutex));
 
 	// create response structure
 	return res_create(headers, buffer, full_req_len + 1);
@@ -408,7 +411,7 @@ int spec_char_sum(char *request_structure, char search_char) {
 		- then a char * for each $ within the body
 	- if no params are wanted, put "" in for param
 */
-res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
+res *send_req(mutex_t sock, char *sub_url, char *type, char *param, ...) {
 	// parse param:
 	va_list read_multi_param;
 	va_start(read_multi_param, param);

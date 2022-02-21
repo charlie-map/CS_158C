@@ -13,6 +13,7 @@ typedef struct MutexLocker {
 	pthread_mutex_t mutex;
 	void *runner;
 } mutex_t;
+mutex_t newMutexLocker(void *payload);
 
 int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t idf, char **ID);
 

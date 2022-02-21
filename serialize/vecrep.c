@@ -49,22 +49,23 @@ typedef struct SerializeObject {
 	char **array_body;
 	int *array_length;
 
-	socket_t **sock_data;
+	mutex_t sock_data;
+
+	trie_t *stopword_trie;
 
 	mutex_t idf; // hashmap *idf
 	mutex_t index_writer; // FILE *index_writer
 	mutex_t title_writer; // FILE *title_writer
 
-	mutex_t doc_bag_length; // int *doc_bag_length
-	mutex_t index_doc_bag;  // int *index_doc_bag
+	int *doc_bag_length; // int *doc_bag_length
 
 	int start_read_body;
 	int end_read_body;
 } serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
-	socket_t **sock_data, hashmap *idf, FILE *index_writer, FILE *title_writer,
-	int *doc_bag_length, int *index_doc_bag, int start_read_body, int end_read_body) {
+	socket_t *sock_data, trie_t *stopword_trie, hashmap *idf, FILE *index_writer,
+	FILE *title_writer, int *doc_bag_length, int start_read_body, int end_read_body) {
 
 	serialize_t *new_ser = malloc(sizeof(serialize_t));
 
@@ -72,15 +73,14 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->array_body = array_body;
 	new_ser->array_length = array_length;
 
-	new_ser->sock_data = sock_data;
+	new_ser->sock_data = newMutexLocker(sock_data);
 
-	new_ser->idf = { .runner = idf, .mutex = PTHREAD_MUTEX_INITIALIZER };
+	new_ser->idf = newMutexLocker(idf);
 
-	new_ser->index_writer = { .runner = index_writer, .mutex = PTHREAD_MUTEX_INITIALIZER };
-	new_ser->title_writer = { .runner = title_writer, .mutex = PTHREAD_MUTEX_INITIALIZER };
+	new_ser->index_writer = newMutexLocker(index_writer);
+	new_ser->title_writer = newMutexLocker(title_writer);
 
-	new_ser->doc_bag_length = { .runner = doc_bag_length, .mutex = PTHREAD_MUTEX_INITIALIZER };
-	new_ser->index_doc_bag =  { .runner = index_doc_bag,  .mutex = PTHREAD_MUTEX_INITIALIZER };
+	new_ser->doc_bag_length = doc_bag_length;
 
 	new_ser->start_read_body = start_read_body;
 	new_ser->end_read_body = end_read_body;
@@ -103,14 +103,13 @@ int main() {
 		exit(1);
 	}
 
-	socket_t **sock_data = malloc(sizeof(socket_t *));
-	*sock_data = get_socket(HOST, PORT);
+	socket_t *sock_data = get_socket(HOST, PORT);
 
 	// calculate idf for each term
 	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
 
 	// initial header request
-	res *response = send_req(*sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
+	res *response = send_req(sock_data, "/pull_page_names", "GET", "-q", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
 
 	// pull array
 	int *array_length = malloc(sizeof(int));
@@ -118,8 +117,6 @@ int main() {
 
 	// each document length (in serialized form)
 	int *doc_bag_length = malloc(sizeof(int) * *array_length);
-	int *index_doc_bag = malloc(sizeof(int)); // pointer to current position in doc_bag_length
-	*index_doc_bag = 0;
 
 	char **all_IDs = malloc(sizeof(char *) * *array_length);
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
@@ -133,8 +130,8 @@ int main() {
 	int doc_per_thread = floor(*array_length / THREAD_NUMBER);
 
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
-		serializer_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data,
-			idf, index_writer, title_writer, thread_rip * doc_per_thread,
+		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data, stopword_trie,
+			idf, index_writer, title_writer, doc_bag_length, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
 		pthread_create(&p_thread[thread_rip], NULL, data_read, new_serializer);
@@ -146,7 +143,6 @@ int main() {
 	}
 
 	free(array_body);
-	free(array_length);
 
 	res_destroy(response);
 
@@ -160,12 +156,12 @@ int main() {
 	// we can go back through the writer again and pull each document out one
 	// at a time and recalculate each term frequency with the new idf value
 	FILE *old_reader = fopen("predocbags.txt", "r");
-	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, index_doc_bag, DTF_THRESHOLD);
+	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, *array_length, DTF_THRESHOLD);
 
 	fclose(old_reader);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(feature_space, index_doc_bag, idf, K, CLUSTER_THRESHOLD);
+	cluster_t **cluster = k_means(feature_space, *array_length, idf, K, CLUSTER_THRESHOLD);
 
 	for (int check_cluster = 0; check_cluster < K; check_cluster++) {
 		printf("-----Check docs on %d-----\n", check_cluster + 1);
@@ -178,13 +174,14 @@ int main() {
 	destroy_cluster(cluster, K);
 
 	// free data:
-	for (int f_feature_space = 0; f_feature_space < index_doc_bag; f_feature_space++) {
+	for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
 		free(all_IDs[f_feature_space]);
 		destroy_hashmap_body(feature_space[f_feature_space]);
 	}
 
 	free(feature_space);
 	free(doc_bag_length);
+	free(array_length);
 
 	free(all_IDs);
 
@@ -199,14 +196,13 @@ int main() {
 		-- char **array_body
 		-- int *array_length
 
-		-- socket_t **sock_data
+		-- socket_t **sock_data (requires mutex locking)
 
 		-- hashmap *idf (requires mutex locking)
 		-- FILE *index_writer (requires mutex locking)
 		-- FILE *title_writer (requires mutex locking)
 
-		-- int *doc_bag_length (requires mutex locking)
-		-- int *index_doc_bag (requires mutex locking)
+		-- int *doc_bag_length
 
 		-- int start_read_body
 		-- int end_read_body
@@ -219,27 +215,22 @@ void *data_read(void *meta_ptr) {
 	char **array_body = ser_pt->array_body;
 	int *array_length = ser_pt->array_length;
 
-	socket_t **sock_data = ser_pt->sock_data;
-
-	hashmap *idf = ser_pt->idf;
-	FILE *index_writer = ser_pt->index_writer;
-	FILE *title_writer = ser_pt->title_writer;
-
-	int *doc_bag_length = ser_pt->doc_bag_length;
-	int *index_doc_bag = ser_pt->index_doc_bag;
+	trie_t *stopword_trie = ser_pt->stopword_trie;
 
 	int start_read_body = ser_pt->start_read_body;
 	int end_read_body = ser_pt->end_read_body;
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
-		printf("id: %s\n", array_body[read_body]);
-		res *wiki_page = send_req(*sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
+		printf("id #%d: %s\n", read_body, array_body[read_body]);
+		res *wiki_page = send_req(ser_pt->sock_data, "/pull_data", "POST", "-q-b", "?name=$&passcode=$", REQ_NAME, REQ_PASSCODE, "unique_id=$", array_body[read_body]);
 
 		if (!wiki_page) { // socket close!
 			// reset socket:
 
-			destroy_socket(*sock_data);
-			*sock_data = get_socket(HOST, PORT);
+			pthread_mutex_lock(&(ser_pt->sock_data.mutex));
+			destroy_socket(ser_pt->sock_data.runner);
+			ser_pt->sock_data.runner = get_socket(HOST, PORT);
+			pthread_mutex_unlock(&(ser_pt->sock_data.mutex));
 
 			// repeat data collection
 			read_body--;
@@ -268,18 +259,14 @@ void *data_read(void *meta_ptr) {
 			free(new_title);
 		}
 
-		int new_doc_length = word_bag(index_writer, title_writer, stopword_trie, new_wiki_page_token, idf, &all_IDs[read_body]);
+		int new_doc_length = word_bag(ser_pt->index_writer, ser_pt->title_writer, stopword_trie, new_wiki_page_token, ser_pt->idf, &all_IDs[read_body]);
 		
-		pthread_mutex_lock(&(ser_pt->doc_bag_length->mutex));
-		pthread_mutex_lock(&(ser_pt->doc_bag_length->mutex));
-		doc_bag_length[index_doc_bag++] = new_doc_length;
-		pthread_mutex_unlock(&(ser_pt->doc_bag_length->mutex));
-		pthread_mutex_unlock(&(ser_pt->doc_bag_length->mutex));
-
-		if (doc_bag_length[index_doc_bag - 1] < 0) {
+		if (new_doc_length < 0) {
 			printf("\nWRITE ERR\n");
 			exit(1);
 		}
+
+		(ser_pt->doc_bag_length)[read_body] = new_doc_length;
 
 		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);
