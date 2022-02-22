@@ -16,6 +16,10 @@ typedef struct SocketData {
 	char *HOST, *PORT;
 } socket_t;
 
+struct MutexPtr {
+	pthread_mutex_t mutex;
+};
+
 socket_t *get_socket(char *HOST, char *PORT);
 int destroy_socket(socket_t *socket_data);
 

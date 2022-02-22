@@ -49,7 +49,8 @@ typedef struct SerializeObject {
 	char **array_body;
 	int *array_length;
 
-	mutex_t sock_data;
+	socket_t *sock_data;
+	pthread_mutex_t *sock_mutex;
 
 	trie_t *stopword_trie;
 
@@ -73,7 +74,9 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->array_body = array_body;
 	new_ser->array_length = array_length;
 
-	new_ser->sock_data = newMutexLocker(sock_data);
+	new_ser->sock_data = sock_data;
+	new_ser->sock_mutex = malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(new_ser->sock_mutex, NULL);
 
 	new_ser->idf = newMutexLocker(idf);
 
@@ -222,21 +225,22 @@ void *data_read(void *meta_ptr) {
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
 		printf("id #%d: %s\n", read_body, array_body[read_body]);
-		res *wiki_page = send_req(ser_pt->sock_data.runner, "/pull_data", "POST", "-b-t", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE, ser_pt->sock_data.mutex);
+		res *wiki_page = send_req(ser_pt->sock_data, "/pull_data", "POST", "-b-t", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE, ser_pt->sock_mutex);
 
 		if (!wiki_page) { // socket close!
 			// reset socket:
 
-			pthread_mutex_lock(&(ser_pt->sock_data.mutex));
-			destroy_socket(ser_pt->sock_data.runner);
-			ser_pt->sock_data.runner = get_socket(HOST, PORT);
-			pthread_mutex_unlock(&(ser_pt->sock_data.mutex));
+			pthread_mutex_lock(ser_pt->sock_mutex);
+			destroy_socket(ser_pt->sock_data);
+			ser_pt->sock_data = get_socket(HOST, PORT);
+			pthread_mutex_unlock(ser_pt->sock_mutex);
 
 			// repeat data collection
 			read_body--;
 			continue;
 		}
 
+		printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
 

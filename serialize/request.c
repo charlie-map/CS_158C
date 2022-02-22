@@ -259,7 +259,7 @@ hashmap *read_headers(char *header_str, int *header_end) {
 }
 
 // takes request url and will build the full url:
-res *send_req_helper(socket_t *socket, pthread_mutex_t socket_mutex, int has_mutex,
+res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 	char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
 	if (strcmp(type, "POST") == 0) { // look for next param
@@ -270,8 +270,11 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t socket_mutex, int has_mut
 	}
 
 	// build the request into the header:
-	if (has_mutex)
-		pthread_mutex_lock(&socket_mutex);
+	if (socket_mutex) {
+		printf("lock\n");
+		pthread_mutex_lock(socket_mutex);
+		printf("locked\n");
+	}
 	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
 
 	// send get request
@@ -324,8 +327,10 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t socket_mutex, int has_mut
 	}
 
 	buffer[full_req_len] = '\0';
-	if (has_mutex)
-		pthread_mutex_unlock(&socket_mutex);
+	if (socket_mutex) {
+		printf("unlock\n");
+		pthread_mutex_unlock(socket_mutex);
+	}
 
 	// create response structure
 	return res_create(headers, buffer, full_req_len + 1);
@@ -427,16 +432,14 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	int *data_length = malloc(sizeof(int));
 	char *new_data = NULL;
 
-	pthread_mutex_t socket_mutex;
-	int has_mutex = 0;
+	pthread_mutex_t *socket_mutex = NULL;
 
 	for (int check_param = 0; param[check_param]; check_param++) {
 		if (param[check_param] != '-')
 			continue;
 
 		if (param[check_param + 1] == 't') {
-			socket_mutex = va_arg(read_multi_param, pthread_mutex_t);;
-			has_mutex = 1;
+			socket_mutex = va_arg(read_multi_param, pthread_mutex_t *);;
 
 			continue;
 		}
@@ -481,7 +484,7 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	}
 
 	// if GET, sending data doesn't matter
-	res *response = send_req_helper(sock, socket_mutex, has_mutex, need_sub_url ? sub_url : new_url,
+	res *response = send_req_helper(sock, socket_mutex, need_sub_url ? sub_url : new_url,
 		url_length, type, new_data);
 
 	if (new_url)
