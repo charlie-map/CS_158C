@@ -65,8 +65,9 @@ typedef struct SerializeObject {
 } serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
-	socket_t *sock_data, trie_t *stopword_trie, hashmap *idf, FILE *index_writer,
-	FILE *title_writer, int *doc_bag_length, int start_read_body, int end_read_body) {
+	socket_t *sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
+	mutex_t idf, mutex_t index_writer, mutex_t title_writer, int *doc_bag_length,
+	int start_read_body, int end_read_body) {
 
 	serialize_t *new_ser = malloc(sizeof(serialize_t));
 
@@ -75,13 +76,12 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->array_length = array_length;
 
 	new_ser->sock_data = sock_data;
-	new_ser->sock_mutex = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(new_ser->sock_mutex, NULL);
+	new_ser->sock_mutex = sock_mutex;
 
-	new_ser->idf = newMutexLocker(idf);
+	new_ser->idf = idf;
 
-	new_ser->index_writer = newMutexLocker(index_writer);
-	new_ser->title_writer = newMutexLocker(title_writer);
+	new_ser->index_writer = index_writer;
+	new_ser->title_writer = title_writer;
 
 	new_ser->doc_bag_length = doc_bag_length;
 
@@ -132,9 +132,22 @@ int main() {
 	// to find how many documents each thread ripper should have
 	int doc_per_thread = floor(*array_length / THREAD_NUMBER);
 
+	// setup mutexes for any params that need a shared mutex:
+	/* e.g.:
+		socket, idf, index_writer, and title_writer
+	*/
+	// socket mutex (socket already created)
+	pthread_mutex_t *sock_mutex = malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(sock_mutex, NULL);
+
+	mutex_t idf_mutex = newMutexLocker(idf);
+	mutex_t index_writer_mutex = newMutexLocker(index_writer);
+	mutex_t title_writer_mutex = newMutexLocker(title_writer);
+
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
-		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data, stopword_trie,
-			idf, index_writer, title_writer, doc_bag_length, thread_rip * doc_per_thread,
+		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data,
+			sock_mutex, stopword_trie, idf_mutex, index_writer_mutex,
+			title_writer_mutex, doc_bag_length, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
 		pthread_create(&p_thread[thread_rip], NULL, data_read, new_serializer);

@@ -272,7 +272,10 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 	// build the request into the header:
 	if (socket_mutex) {
 		printf("lock\n");
-		pthread_mutex_lock(socket_mutex);
+		// wait for other lock to finish
+		int mutex_try_num;
+		printf("%d\n", socket_mutex);
+		while ((mutex_try_num = pthread_mutex_trylock(socket_mutex)) != 0);
 		printf("locked\n");
 	}
 	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
@@ -316,6 +319,8 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 	free(header_read);
 	free(header_end);
 
+	printf("pre revc\n");
+
 	while (buffer_bytes < full_req_len) {
 		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
 
@@ -325,6 +330,8 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 
 		buffer_bytes += new_bytes;
 	}
+
+	printf("after recv\n");
 
 	buffer[full_req_len] = '\0';
 	if (socket_mutex) {
@@ -351,6 +358,7 @@ socket_t *get_socket(char *HOST, char *PORT) {
 	hints.ai_socktype = SOCK_STREAM;  // TCP stream sockets
 	hints.ai_flags = AI_PASSIVE;	  // fill in my IP for me
 
+	printf("%s %s\n", HOST, PORT);
 	if ((status = getaddrinfo(HOST, PORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
 		exit(1);
