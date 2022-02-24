@@ -377,6 +377,8 @@ socket_t *get_socket(char *HOST, char *PORT) {
 }
 
 int destroy_socket(socket_t *socket_data) {
+	if (!socket_data->servinfo)
+		return 0;
 	freeaddrinfo((struct addrinfo *) socket_data->servinfo);
 
 	free(socket_data);
