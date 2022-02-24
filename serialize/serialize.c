@@ -204,12 +204,12 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
 
 	// write to title_fp
-	pthread_mutex_lock(&index_fp.mutex);
-	fputs(*ID, index_fp.runner);
-	fputs(":", index_fp.runner);
-	fputs(title, index_fp.runner);
-	fputs("\n", index_fp.runner);
-	pthread_mutex_unlock(&index_fp.mutex);
+	pthread_mutex_lock(&title_fp.mutex);
+	fputs(*ID, title_fp.runner);
+	fputs(":", title_fp.runner);
+	fputs(title, title_fp.runner);
+	fputs("\n", title_fp.runner);
+	pthread_mutex_unlock(&title_fp.mutex);
 
 	free(title_len);
 	free(title);
@@ -308,8 +308,6 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 	// setup index file:
 	pthread_mutex_lock(&index_fp.mutex);
 	int check = fputs(*ID, index_fp.runner);
-	pthread_mutex_unlock(&index_fp.mutex); // close to allow others to use
-		// while calculating sum of squares (slow)
 
 	if (check == -1) return -1;
 
@@ -322,7 +320,6 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 
 	sprintf(sum_square_char, " %d ", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	pthread_mutex_lock(&index_fp.mutex);
 	check = fputs(sum_square_char, index_fp.runner);
 
 	if (check == -1) return -1;

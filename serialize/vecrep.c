@@ -23,6 +23,9 @@
 #define DTF_THRESHOLD 0
 #define CLUSTER_THRESHOLD 2
 
+pthread_rwlock_t rwlock;
+pthread_rwlockattr_t attr;
+
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
 
@@ -49,8 +52,7 @@ typedef struct SerializeObject {
 	char **array_body;
 	int *array_length;
 
-	socket_t *sock_data;
-	pthread_mutex_t *sock_mutex;
+	socket_t **sock_data;
 
 	trie_t *stopword_trie;
 
@@ -65,7 +67,7 @@ typedef struct SerializeObject {
 } serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
-	socket_t *sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
+	socket_t **sock_data, trie_t *stopword_trie,
 	mutex_t idf, mutex_t index_writer, mutex_t title_writer, int *doc_bag_length,
 	int start_read_body, int end_read_body) {
 
@@ -76,7 +78,8 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->array_length = array_length;
 
 	new_ser->sock_data = sock_data;
-	new_ser->sock_mutex = sock_mutex;
+
+	new_ser->stopword_trie = stopword_trie;
 
 	new_ser->idf = idf;
 
@@ -136,17 +139,22 @@ int main() {
 	/* e.g.:
 		socket, idf, index_writer, and title_writer
 	*/
-	// socket mutex (socket already created)
-	pthread_mutex_t *sock_mutex = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(sock_mutex, NULL);
+	pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+	if (pthread_rwlock_init(&rwlock, &attr) != 0) {
+
+		printf("Bad sock lock\n");
+		exit(1);
+	}
+	socket_t **sock_sock = malloc(sizeof(socket_t *));
+	*sock_sock = sock_data;
 
 	mutex_t idf_mutex = newMutexLocker(idf);
 	mutex_t index_writer_mutex = newMutexLocker(index_writer);
 	mutex_t title_writer_mutex = newMutexLocker(title_writer);
 
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
-		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_data,
-			sock_mutex, stopword_trie, idf_mutex, index_writer_mutex,
+		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_sock,
+			stopword_trie, idf_mutex, index_writer_mutex,
 			title_writer_mutex, doc_bag_length, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
@@ -237,23 +245,24 @@ void *data_read(void *meta_ptr) {
 	int end_read_body = ser_pt->end_read_body;
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
-		printf("id #%d: %s\n", read_body, array_body[read_body]);
-		res *wiki_page = send_req(ser_pt->sock_data, "/pull_data", "POST", "-b-t", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE, ser_pt->sock_mutex);
+		printf("lock %d %d\n", read_body, ser_pt->sock_data);
+		pthread_rwlock_wrlock(&rwlock);
 
+		res *wiki_page = send_req(*(ser_pt->sock_data), "/pull_data", "POST", "-b", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE);
 		if (!wiki_page) { // socket close!
 			// reset socket:
 
-			pthread_mutex_lock(ser_pt->sock_mutex);
-			destroy_socket(ser_pt->sock_data);
-			ser_pt->sock_data = get_socket(HOST, PORT);
-			pthread_mutex_unlock(ser_pt->sock_mutex);
+			destroy_socket(*(ser_pt->sock_data));
+			*(ser_pt->sock_data) = get_socket(HOST, PORT);
 
 			// repeat data collection
+			pthread_rwlock_unlock(&rwlock);
 			read_body--;
 			continue;
 		}
+		pthread_rwlock_unlock(&rwlock);
 
-		printf("CHECK: %s\n", res_body(wiki_page));
+		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
 

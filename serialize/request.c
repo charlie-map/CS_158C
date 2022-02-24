@@ -259,8 +259,7 @@ hashmap *read_headers(char *header_str, int *header_end) {
 }
 
 // takes request url and will build the full url:
-res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
-	char *request_url, int *url_length, char *type, ...) {
+res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
 	if (strcmp(type, "POST") == 0) { // look for next param
 		va_list post_data;
@@ -269,15 +268,6 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 		data = va_arg(post_data, char *);
 	}
 
-	// build the request into the header:
-	if (socket_mutex) {
-		printf("lock\n");
-		// wait for other lock to finish
-		int mutex_try_num;
-		printf("%d\n", socket_mutex);
-		while ((mutex_try_num = pthread_mutex_trylock(socket_mutex)) != 0);
-		printf("locked\n");
-	}
 	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
 
 	// send get request
@@ -297,7 +287,6 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 	memset(header_read, '\0', header_len);
 
 	curr_bytes_recv += recv(socket->sock, header_read, header_len, 0);
-
 	if (curr_bytes_recv == 0) {// missing data -- socket closed
 		free(header_read);
 		return NULL;
@@ -319,10 +308,8 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 	free(header_read);
 	free(header_end);
 
-	printf("pre revc\n");
-
 	while (buffer_bytes < full_req_len) {
-		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
+		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len - buffer_bytes, 0);
 
 		if (new_bytes == -1) {
 			continue;
@@ -331,13 +318,7 @@ res *send_req_helper(socket_t *socket, pthread_mutex_t *socket_mutex,
 		buffer_bytes += new_bytes;
 	}
 
-	printf("after recv\n");
-
 	buffer[full_req_len] = '\0';
-	if (socket_mutex) {
-		printf("unlock\n");
-		pthread_mutex_unlock(socket_mutex);
-	}
 
 	// create response structure
 	return res_create(headers, buffer, full_req_len + 1);
@@ -425,7 +406,6 @@ int spec_char_sum(char *request_structure, char search_char) {
 		does not start with a "?":
 		"name=$&passcode=$"
 		- then a char * for each $ within the body
-	- "-t" for adding a mutex locker to the socket (only needed for threading)
 	- if no params are wanted, put "" in for param
 */
 res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
@@ -440,17 +420,9 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	int *data_length = malloc(sizeof(int));
 	char *new_data = NULL;
 
-	pthread_mutex_t *socket_mutex = NULL;
-
 	for (int check_param = 0; param[check_param]; check_param++) {
 		if (param[check_param] != '-')
 			continue;
-
-		if (param[check_param + 1] == 't') {
-			socket_mutex = va_arg(read_multi_param, pthread_mutex_t *);;
-
-			continue;
-		}
 
 		if (param[check_param + 1] != 'q' && param[check_param + 1] != 'b')
 			continue;
@@ -492,7 +464,7 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	}
 
 	// if GET, sending data doesn't matter
-	res *response = send_req_helper(sock, socket_mutex, need_sub_url ? sub_url : new_url,
+	res *response = send_req_helper(sock, need_sub_url ? sub_url : new_url,
 		url_length, type, new_data);
 
 	if (new_url)
