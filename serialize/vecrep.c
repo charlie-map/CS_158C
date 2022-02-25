@@ -167,20 +167,27 @@ int main() {
 	mutex_t *title_writer_mutex = malloc(sizeof(mutex_t));
 	*title_writer_mutex = newMutexLocker(title_writer);
 
+	serialize_t **serializers = malloc(sizeof(serialize_t *) * THREAD_NUMBER);
+
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
-		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
+		serializers[thread_rip] = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
 			sock_mutex[thread_rip / 3], stopword_trie, idf_mutex, index_writer_mutex,
 			title_writer_mutex, doc_bag_length, doc_bag_mutex, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
-		pthread_create(&p_thread[thread_rip], NULL, data_read, new_serializer);
+		pthread_create(&p_thread[thread_rip], NULL, data_read, serializers[thread_rip]);
 	}
 
 	// rejoin threads
 	for (int rejoin_thread = 0; rejoin_thread < THREAD_NUMBER; rejoin_thread++) {
 		pthread_join(p_thread[rejoin_thread], NULL);
+
+		free(serializers[rejoin_thread]);
 	}
 
+	free(serializers);
+
+	free(p_thread);
 	free(array_body);
 
 	res_destroy(response);
@@ -220,6 +227,7 @@ int main() {
 	}
 
 	free(feature_space);
+	free(doc_bag_index);
 	free(doc_bag_mutex);
 	free(doc_bag_length);
 	free(array_length);
@@ -230,13 +238,14 @@ int main() {
 	deepdestroy__hashmap(idf);
 
 	// free sockets
-	for (int free_socket = 0; free_socket < THREAD_NUMBER / 3; free_socket++) {
+	for (int free_socket = 0; free_socket < THREAD_NUMBER / 2; free_socket++) {
 		free(sock_mutex[free_socket]);
 
 		destroy_socket(*(socket_holder[free_socket]));
 		free(socket_holder[free_socket]);
 	}
 
+	free(sock_mutex);
 	free(socket_holder);
 
 	return 0;
