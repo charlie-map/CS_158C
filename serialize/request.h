@@ -2,6 +2,7 @@
 #define __SOCKET_L__
 
 #include "hashmap.h"
+#include "serialize.h"
 
 typedef struct Response res;
 char *res_body(res *re);
@@ -14,6 +15,10 @@ typedef struct SocketData {
 	void *servinfo;
 	char *HOST, *PORT;
 } socket_t;
+
+struct MutexPtr {
+	pthread_mutex_t mutex;
+};
 
 socket_t *get_socket(char *HOST, char *PORT);
 int destroy_socket(socket_t *socket_data);

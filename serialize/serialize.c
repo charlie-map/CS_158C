@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "serialize.h"
 #include "../stemmer.h"
@@ -26,6 +27,12 @@ int delimeter_check(char curr_char, char *delims) {
 	}
 
 	return 0;
+}
+
+mutex_t newMutexLocker(void *payload) {
+	mutex_t new_mutexer = { .runner = payload, .mutex = PTHREAD_MUTEX_INITIALIZER };
+
+	return new_mutexer;
 }
 
 /*
@@ -177,7 +184,11 @@ void *is_block(void *hmap, char *tag) {
 	return get__hashmap((hashmap *) hmap, tag, 0);
 }
 
-int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *full_page, hashmap *idf_hash, char **ID) {
+/* Update to wordbag:
+	Now index_fp, title_fp, and idf_hash need mutex locking,
+	so bring mutex attr with them
+*/
+int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t *idf_hash, char **ID) {
 	int total_bag_size = 0;
 
 	// create title page:
@@ -193,10 +204,12 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
 
 	// write to title_fp
-	fputs(*ID, title_fp);
-	fputs(":", title_fp);
-	fputs(title, title_fp);
-	fputs("\n", title_fp);
+	pthread_mutex_lock(&(title_fp->mutex));
+	fputs(*ID, title_fp->runner);
+	fputs(":", title_fp->runner);
+	fputs(title, title_fp->runner);
+	fputs("\n", title_fp->runner);
+	pthread_mutex_unlock(&(title_fp->mutex));
 
 	free(title_len);
 	free(title);
@@ -248,10 +261,10 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 		// get from word_freq_hash:
 		// get char * from idf and free full_page_data
-		char *freq_key = getKey__hashmap(idf_hash, full_page_data[add_hash]);
+		char *freq_key = getKey__hashmap(idf_hash->runner, full_page_data[add_hash]);
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash], 0);
 		idf_t *idf;
-		idf = freq_key ? get__hashmap(idf_hash, full_page_data[add_hash], 0) : NULL;
+		idf = freq_key ? get__hashmap(idf_hash->runner, full_page_data[add_hash], 0) : NULL;
 
 		if (hashmap_freq) {
 			free(full_page_data[add_hash]);
@@ -266,6 +279,8 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 		insert__hashmap(word_freq_hash, freq_key ? freq_key : full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 		// check prev_idf_ID to make sure it doesn't match current index
+		pthread_mutex_lock(&(idf_hash->mutex));
+
 		if (idf && strcmp(idf->prev_idf_ID, *ID) == 0) { // skip (duplicate)
 			continue;
 		} else if (idf) { // add to current frequency
@@ -275,8 +290,10 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 			idf = malloc(sizeof(idf_t));
 			idf->document_freq = 1;
 			idf->prev_idf_ID = *ID;
-			insert__hashmap(idf_hash, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
+			insert__hashmap(idf_hash->runner, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
 		}
+
+		pthread_mutex_unlock(&(idf_hash->mutex));
 
 		if (freq_key)
 			free(full_page_data[add_hash]);
@@ -289,7 +306,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
 
 	// setup index file:
-	int check = fputs(*ID, index_fp);
+	int check = fputs(*ID, index_fp->runner);
 
 	if (check == -1) return -1;
 
@@ -302,7 +319,7 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 
 	sprintf(sum_square_char, " %d ", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	check = fputs(sum_square_char, index_fp);
+	check = fputs(sum_square_char, index_fp->runner);
 
 	if (check == -1) return -1;
 
@@ -320,15 +337,15 @@ int word_bag(FILE *index_fp, FILE *title_fp, trie_t *stopword_trie, token_t *ful
 		// add length of key_freq_str to bag_size:
 		total_bag_size += strlen(key_freq_str);
 
-		check = fputs(keys[write_key], index_fp);
+		check = fputs(keys[write_key], index_fp->runner);
 		if (check == -1) return -1;
-		check = fputs(key_freq_str, index_fp);
+		check = fputs(key_freq_str, index_fp->runner);
 		if (check == -1) return -1;
 
 		free(key_freq_str);
 	}
 
-	fputs("\n", index_fp);
+	fputs("\n", index_fp->runner);
 	total_bag_size++;
 
 	free(keys);

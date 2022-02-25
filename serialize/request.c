@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 // all socket related packages
 #include <sys/types.h>
@@ -267,7 +268,6 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 		data = va_arg(post_data, char *);
 	}
 
-	// build the request into the header:
 	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
 
 	// send get request
@@ -287,7 +287,6 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	memset(header_read, '\0', header_len);
 
 	curr_bytes_recv += recv(socket->sock, header_read, header_len, 0);
-
 	if (curr_bytes_recv == 0) {// missing data -- socket closed
 		free(header_read);
 		return NULL;
@@ -310,7 +309,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	free(header_end);
 
 	while (buffer_bytes < full_req_len) {
-		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len, 0);
+		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len - buffer_bytes, 0);
 
 		if (new_bytes == -1) {
 			continue;
@@ -377,6 +376,8 @@ socket_t *get_socket(char *HOST, char *PORT) {
 }
 
 int destroy_socket(socket_t *socket_data) {
+	if (!socket_data->servinfo)
+		return 0;
 	freeaddrinfo((struct addrinfo *) socket_data->servinfo);
 
 	free(socket_data);
@@ -414,7 +415,8 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	va_start(read_multi_param, param);
 
 	int *url_length = malloc(sizeof(int));
-	char *new_url;
+	*url_length = 0;
+	char *new_url = NULL;
 
 	int *data_length = malloc(sizeof(int));
 	char *new_data = NULL;
@@ -451,14 +453,23 @@ res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...) {
 	}
 
 	free(data_length);
+	int need_sub_url = 0;
 
-	if (*url_length == 0)
-		return NULL;
+	if (*url_length == 0) {
+		*url_length = strlen(sub_url);
+
+		if (*url_length == 0) // real bad!
+			return NULL;
+
+		need_sub_url = 1;
+	}
 
 	// if GET, sending data doesn't matter
-	res *response = send_req_helper(sock, new_url, url_length, type, new_data);
+	res *response = send_req_helper(sock, need_sub_url ? sub_url : new_url,
+		url_length, type, new_data);
 
-	free(new_url);
+	if (new_url)
+		free(new_url);
 	free(url_length);
 
 	if (new_data)
