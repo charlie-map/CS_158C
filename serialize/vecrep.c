@@ -50,7 +50,7 @@ typedef struct SerializeObject {
 	int *array_length;
 
 	socket_t **sock_data;
-	pthread_rwlock_t *rwlock;
+	pthread_mutex_t *sock_mutex;
 
 	trie_t *stopword_trie;
 
@@ -65,7 +65,7 @@ typedef struct SerializeObject {
 } serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
-	socket_t **sock_data, pthread_rwlock_t *rwlock, trie_t *stopword_trie,
+	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
 	mutex_t idf, mutex_t index_writer, mutex_t title_writer, int *doc_bag_length,
 	int start_read_body, int end_read_body) {
 
@@ -76,7 +76,7 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->array_length = array_length;
 
 	new_ser->sock_data = sock_data;
-	new_ser->rwlock = rwlock;
+	new_ser->sock_mutex = sock_mutex;
 
 	new_ser->stopword_trie = stopword_trie;
 
@@ -138,25 +138,29 @@ int main() {
 	/* e.g.:
 		socket, idf, index_writer, and title_writer
 	*/
-	pthread_rwlock_t *rwlock = malloc(sizeof(pthread_rwlock_t));
-	pthread_rwlockattr_t attr;
+	printf("%d\n", THREAD_NUMBER / 2);
+	pthread_mutex_t **sock_mutex = malloc(sizeof(pthread_mutex_t *) * (THREAD_NUMBER / 2));
+	socket_t ***socket_holder = malloc(sizeof(socket_t **) * (THREAD_NUMBER / 2));
+	socket_holder[0] = malloc(sizeof(socket_t *));
+	*(socket_holder[0]) = sock_data;
 
-	pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
-	if (pthread_rwlock_init(rwlock, &attr) != 0) {
+	for (int create_sock_mutex = 0; create_sock_mutex < THREAD_NUMBER / 2; create_sock_mutex++) {
+		sock_mutex[create_sock_mutex] = malloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(sock_mutex[create_sock_mutex], NULL);
 
-		printf("Bad sock lock\n");
-		exit(1);
+		if (create_sock_mutex > 0) {
+			socket_holder[create_sock_mutex] = malloc(sizeof(socket_t *));
+			*(socket_holder[create_sock_mutex]) = get_socket(HOST, PORT);
+		}
 	}
-	socket_t **sock_sock = malloc(sizeof(socket_t *));
-	*sock_sock = sock_data;
 
 	mutex_t idf_mutex = newMutexLocker(idf);
 	mutex_t index_writer_mutex = newMutexLocker(index_writer);
 	mutex_t title_writer_mutex = newMutexLocker(title_writer);
 
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
-		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, sock_sock,
-			rwlock, stopword_trie, idf_mutex, index_writer_mutex,
+		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
+			sock_mutex[thread_rip / 3], stopword_trie, idf_mutex, index_writer_mutex,
 			title_writer_mutex, doc_bag_length, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
@@ -175,7 +179,6 @@ int main() {
 	fclose(index_writer);
 	fclose(title_writer);
 
-	destroy_socket(sock_data);
 	trie_destroy(stopword_trie);
 
 	// now we have idf for all terms, and the length of each bag of terms
@@ -247,9 +250,9 @@ void *data_read(void *meta_ptr) {
 	int end_read_body = ser_pt->end_read_body;
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
-		printf("lock %d %d %d\n", read_body, ser_pt->sock_data, ser_pt->rwlock);
-		pthread_rwlock_wrlock(ser_pt->rwlock);
-		printf("locked %d\n", ser_pt->rwlock);
+		printf("lock %d %d %d\n", read_body, ser_pt->sock_data, ser_pt->sock_mutex);
+		pthread_mutex_lock(ser_pt->sock_mutex);
+		printf("locked %d\n", ser_pt->sock_mutex);
 
 		res *wiki_page = send_req(*(ser_pt->sock_data), "/pull_data", "POST", "-b", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE);
 		if (!wiki_page) { // socket close!
@@ -259,11 +262,11 @@ void *data_read(void *meta_ptr) {
 			*(ser_pt->sock_data) = get_socket(HOST, PORT);
 
 			// repeat data collection
-			pthread_rwlock_unlock(ser_pt->rwlock);
+			pthread_mutex_unlock(ser_pt->sock_mutex);
 			read_body--;
 			continue;
 		}
-		pthread_rwlock_unlock(ser_pt->rwlock);
+		pthread_mutex_unlock(ser_pt->sock_mutex);
 
 		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words

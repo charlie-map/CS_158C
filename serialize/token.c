@@ -324,7 +324,7 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		str_read_index++;
 
 		// check for resize
-		if ((str_read_index) * sizeof(char) == *buffer_size) {
+		if ((str_read_index + 1) * sizeof(char) == *buffer_size) {
 			// increase
 			*buffer_size *= 2;
 			*curr_line = realloc(*curr_line, *buffer_size);

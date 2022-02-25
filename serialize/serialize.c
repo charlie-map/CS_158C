@@ -405,6 +405,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
 		// for each word:freq pair:
+		printf("%d\n", *word_bag_words_max);
 		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
 			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc], 1);
 			free(word_bag_words[check_doc]);
