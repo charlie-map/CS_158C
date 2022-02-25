@@ -188,7 +188,7 @@ void *is_block(void *hmap, char *tag) {
 	Now index_fp, title_fp, and idf_hash need mutex locking,
 	so bring mutex attr with them
 */
-int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t idf_hash, char **ID) {
+int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t *idf_hash, char **ID) {
 	int total_bag_size = 0;
 
 	// create title page:
@@ -204,12 +204,12 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
 
 	// write to title_fp
-	pthread_mutex_lock(&title_fp.mutex);
-	fputs(*ID, title_fp.runner);
-	fputs(":", title_fp.runner);
-	fputs(title, title_fp.runner);
-	fputs("\n", title_fp.runner);
-	pthread_mutex_unlock(&title_fp.mutex);
+	pthread_mutex_lock(&(title_fp->mutex));
+	fputs(*ID, title_fp->runner);
+	fputs(":", title_fp->runner);
+	fputs(title, title_fp->runner);
+	fputs("\n", title_fp->runner);
+	pthread_mutex_unlock(&(title_fp->mutex));
 
 	free(title_len);
 	free(title);
@@ -261,10 +261,10 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 
 		// get from word_freq_hash:
 		// get char * from idf and free full_page_data
-		char *freq_key = getKey__hashmap(idf_hash.runner, full_page_data[add_hash]);
+		char *freq_key = getKey__hashmap(idf_hash->runner, full_page_data[add_hash]);
 		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash], 0);
 		idf_t *idf;
-		idf = freq_key ? get__hashmap(idf_hash.runner, full_page_data[add_hash], 0) : NULL;
+		idf = freq_key ? get__hashmap(idf_hash->runner, full_page_data[add_hash], 0) : NULL;
 
 		if (hashmap_freq) {
 			free(full_page_data[add_hash]);
@@ -279,7 +279,7 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 
 		insert__hashmap(word_freq_hash, freq_key ? freq_key : full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
 		// check prev_idf_ID to make sure it doesn't match current index
-		pthread_mutex_lock(&idf_hash.mutex);
+		pthread_mutex_lock(&(idf_hash->mutex));
 
 		if (idf && strcmp(idf->prev_idf_ID, *ID) == 0) { // skip (duplicate)
 			continue;
@@ -290,10 +290,10 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 			idf = malloc(sizeof(idf_t));
 			idf->document_freq = 1;
 			idf->prev_idf_ID = *ID;
-			insert__hashmap(idf_hash.runner, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
+			insert__hashmap(idf_hash->runner, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
 		}
 
-		pthread_mutex_unlock(&idf_hash.mutex);
+		pthread_mutex_unlock(&(idf_hash->mutex));
 
 		if (freq_key)
 			free(full_page_data[add_hash]);
@@ -306,8 +306,7 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
 
 	// setup index file:
-	pthread_mutex_lock(&index_fp.mutex);
-	int check = fputs(*ID, index_fp.runner);
+	int check = fputs(*ID, index_fp->runner);
 
 	if (check == -1) return -1;
 
@@ -320,7 +319,7 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 
 	sprintf(sum_square_char, " %d ", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	check = fputs(sum_square_char, index_fp.runner);
+	check = fputs(sum_square_char, index_fp->runner);
 
 	if (check == -1) return -1;
 
@@ -338,17 +337,16 @@ int word_bag(mutex_t index_fp, mutex_t title_fp, trie_t *stopword_trie, token_t 
 		// add length of key_freq_str to bag_size:
 		total_bag_size += strlen(key_freq_str);
 
-		check = fputs(keys[write_key], index_fp.runner);
+		check = fputs(keys[write_key], index_fp->runner);
 		if (check == -1) return -1;
-		check = fputs(key_freq_str, index_fp.runner);
+		check = fputs(key_freq_str, index_fp->runner);
 		if (check == -1) return -1;
 
 		free(key_freq_str);
 	}
 
-	fputs("\n", index_fp.runner);
+	fputs("\n", index_fp->runner);
 	total_bag_size++;
-	pthread_mutex_unlock(&index_fp.mutex);
 
 	free(keys);
 	free(key_len);
@@ -394,7 +392,6 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		int *word_bag_words_max = malloc(sizeof(int));
 		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
 
-		printf("%s: %d\n", word_bag_words[0], word_bag_len[doc_index] + 1);
 		free(word_bag);
 
 		hashmap_body_t *new_map = malloc(sizeof(hashmap_body_t));
@@ -406,7 +403,6 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
 		// for each word:freq pair:
-		printf("%s %s %d\n", new_map->id, word_bag_words[*word_bag_words_max - 1], *word_bag_words_max);
 		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
 			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc], 1);
 			free(word_bag_words[check_doc]);
