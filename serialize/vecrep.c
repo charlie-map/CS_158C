@@ -58,6 +58,7 @@ typedef struct SerializeObject {
 	mutex_t index_writer; // FILE *index_writer
 	mutex_t title_writer; // FILE *title_writer
 
+	mutex_t doc_bag_index;
 	int *doc_bag_length; // int *doc_bag_length
 
 	int start_read_body;
@@ -66,7 +67,7 @@ typedef struct SerializeObject {
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
 	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
-	mutex_t idf, mutex_t index_writer, mutex_t title_writer, int *doc_bag_length,
+	mutex_t idf, mutex_t index_writer, mutex_t title_writer, int *doc_bag_length, mutex_t doc_bag_index,
 	int start_read_body, int end_read_body) {
 
 	serialize_t *new_ser = malloc(sizeof(serialize_t));
@@ -86,6 +87,7 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	new_ser->title_writer = title_writer;
 
 	new_ser->doc_bag_length = doc_bag_length;
+	new_ser->doc_bag_index = doc_bag_index;
 
 	new_ser->start_read_body = start_read_body;
 	new_ser->end_read_body = end_read_body;
@@ -122,6 +124,9 @@ int main() {
 
 	// each document length (in serialized form)
 	int *doc_bag_length = malloc(sizeof(int) * *array_length);
+	int *doc_bag_index = malloc(sizeof(int));
+	*doc_bag_index = 0;
+	mutex_t doc_bag_mutex = newMutexLocker(doc_bag_index);
 
 	char **all_IDs = malloc(sizeof(char *) * *array_length);
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
@@ -161,7 +166,7 @@ int main() {
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
 		serialize_t *new_serializer = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
 			sock_mutex[thread_rip / 3], stopword_trie, idf_mutex, index_writer_mutex,
-			title_writer_mutex, doc_bag_length, thread_rip * doc_per_thread,
+			title_writer_mutex, doc_bag_length, doc_bag_mutex, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
 		pthread_create(&p_thread[thread_rip], NULL, data_read, new_serializer);
@@ -250,9 +255,9 @@ void *data_read(void *meta_ptr) {
 	int end_read_body = ser_pt->end_read_body;
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
-		printf("lock %d %d %d\n", read_body, ser_pt->sock_data, ser_pt->sock_mutex);
+		printf("lock %d\n", read_body);
 		pthread_mutex_lock(ser_pt->sock_mutex);
-		printf("locked %d\n", ser_pt->sock_mutex);
+		printf("locked %d\n", read_body);
 
 		res *wiki_page = send_req(*(ser_pt->sock_data), "/pull_data", "POST", "-b", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE);
 		if (!wiki_page) { // socket close!
@@ -298,7 +303,9 @@ void *data_read(void *meta_ptr) {
 			exit(1);
 		}
 
-		(ser_pt->doc_bag_length)[read_body] = new_doc_length;
+		pthread_mutex_lock(&(ser_pt->doc_bag_index.mutex));
+		(ser_pt->doc_bag_length)[(*(int *) (ser_pt->doc_bag_index.runner))++] = new_doc_length;
+		pthread_mutex_unlock(&(ser_pt->doc_bag_index.mutex));
 
 		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);

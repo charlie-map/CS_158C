@@ -394,6 +394,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		int *word_bag_words_max = malloc(sizeof(int));
 		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
 
+		printf("%s: %d\n", word_bag_words[0], word_bag_len[doc_index] + 1);
 		free(word_bag);
 
 		hashmap_body_t *new_map = malloc(sizeof(hashmap_body_t));
@@ -405,7 +406,7 @@ hashmap_body_t **word_bag_idf(FILE *index_reader, hashmap *idf, int *word_bag_le
 		new_map->map = make__hashmap(0, NULL, destroy_hashmap_float);
 
 		// for each word:freq pair:
-		printf("%d\n", *word_bag_words_max);
+		printf("%s %s %d\n", new_map->id, word_bag_words[*word_bag_words_max - 1], *word_bag_words_max);
 		for (int check_doc = 2; check_doc < *word_bag_words_max; check_doc += 2) {
 			hashmap__response *word_dtf = get__hashmap(idf, word_bag_words[check_doc], 1);
 			free(word_bag_words[check_doc]);

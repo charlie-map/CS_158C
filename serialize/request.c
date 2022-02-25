@@ -339,7 +339,6 @@ socket_t *get_socket(char *HOST, char *PORT) {
 	hints.ai_socktype = SOCK_STREAM;  // TCP stream sockets
 	hints.ai_flags = AI_PASSIVE;	  // fill in my IP for me
 
-	printf("%s %s\n", HOST, PORT);
 	if ((status = getaddrinfo(HOST, PORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
 		exit(1);
