@@ -187,7 +187,6 @@ int main() {
 
 	res_destroy(response);
 
-	free(index_writer_mutex);
 	fclose(index_writer);
 	free(title_writer_mutex);
 	fclose(title_writer);
@@ -201,53 +200,50 @@ int main() {
 	// now we have idf for all terms, and the length of each bag of terms
 	// we can go back through the writer again and pull each document out one
 	// at a time and recalculate each term frequency with the new idf value
-	FILE *old_reader = fopen("predocbags.txt", "r");
-	hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, *array_length, DTF_THRESHOLD);
+	// FILE *old_reader = fopen("predocbags.txt", "r");
+	// hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, *array_length, DTF_THRESHOLD);
 
-	fclose(old_reader);
+	// fclose(old_reader);
 
-	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(feature_space, *array_length, idf, K, CLUSTER_THRESHOLD);
+	// // start k-means to calculate clusters
+	// cluster_t **cluster = k_means(feature_space, *array_length, idf, K, CLUSTER_THRESHOLD);
 
-	for (int check_cluster = 0; check_cluster < K; check_cluster++) {
-		printf("-----Check docs on %d-----\n", check_cluster + 1);
+	// for (int check_cluster = 0; check_cluster < K; check_cluster++) {
+	// 	printf("-----Check docs on %d-----\n", check_cluster + 1);
 
-		for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
-			printf("ID: %s\n", feature_space[cluster[check_cluster]->doc_pos[read_cluster_doc]]->id);
-		}
-	}
+	// 	for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
+	// 		printf("ID: %s\n", feature_space[cluster[check_cluster]->doc_pos[read_cluster_doc]]->id);
+	// 	}
+	// }
 
-	destroy_cluster(cluster, K);
+	// destroy_cluster(cluster, K);
 
-	// free data:
-	for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
-		free(all_IDs[f_feature_space]);
-		destroy_hashmap_body(feature_space[f_feature_space]);
-	}
+	// // free data:
+	// for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
+	// 	free(all_IDs[f_feature_space]);
+	// 	destroy_hashmap_body(feature_space[f_feature_space]);
+	// }
 
-	free(feature_space);
-	free(doc_bag_index);
-	free(doc_bag_mutex);
-	free(doc_bag_length);
-	free(array_length);
+	// free(feature_space);
+	// free(doc_bag_index);
+	// free(doc_bag_mutex);
+	// free(doc_bag_length);
+	// free(array_length);
 
-	free(all_IDs);
+	// free(all_IDs);
 
-	free(idf_mutex);
-	deepdestroy__hashmap(idf);
+	// // free sockets
+	// for (int free_socket = 0; free_socket < THREAD_NUMBER / 2; free_socket++) {
+	// 	free(sock_mutex[free_socket]);
 
-	// free sockets
-	for (int free_socket = 0; free_socket < THREAD_NUMBER / 2; free_socket++) {
-		free(sock_mutex[free_socket]);
+	// 	destroy_socket(*(socket_holder[free_socket]));
+	// 	free(socket_holder[free_socket]);
+	// }
 
-		destroy_socket(*(socket_holder[free_socket]));
-		free(socket_holder[free_socket]);
-	}
+	// free(sock_mutex);
+	// free(socket_holder);
 
-	free(sock_mutex);
-	free(socket_holder);
-
-	return 0;
+	// return 0;
 }
 
 /*

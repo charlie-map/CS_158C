@@ -197,7 +197,7 @@ int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index, i
 			void *
 */
 void **keys__hashmap(hashmap *hash__m, int *max_key, char *p, ...) {
-	int (*is_m)(void *) = NULL;
+	int (*is_m)(void *, void *) = NULL;
 	void *m_cmp = NULL;
 
 	va_list extra_param;
@@ -205,7 +205,7 @@ void **keys__hashmap(hashmap *hash__m, int *max_key, char *p, ...) {
 
 	for (int check_p = 0; p[check_p]; check_p++) {
 		if (p[check_p] == 'm') {
-			is_m = va_arg(extra_param, int (*)(void *));
+			is_m = va_arg(extra_param, int (*)(void *, void *));
 			m_cmp = va_arg(extra_param, void *);
 		}
 	}

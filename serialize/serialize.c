@@ -29,23 +29,6 @@ int delimeter_check(char curr_char, char *delims) {
 	return 0;
 }
 
-mutex_t *mewtexLocker(void *payload) {
-	mutex_t *new_mutexer = malloc(sizeof(mutex_t));
-
-	new_mutexer->runner = payload;
-	new_mutexer->mutex = PTHREAD_MUTEX_INITIALIZER;
-
-	return new_mutexer;
-}
-
-void freeMewtexLocker(void *mutexer) {
-	free(((mutex_t *) mutexer)->runner);
-
-	free(mutexer);
-
-	return;
-}
-
 mutex_t newMutexLocker(void *payload) {
 	mutex_t new_mutexer = { .runner = payload, .mutex = PTHREAD_MUTEX_INITIALIZER };
 
@@ -210,15 +193,15 @@ tf_t *new_tf_t(char *ID) {
 	new_tf->curr_doc_id = ID;
 	new_tf->curr_term_freq = 1;
 
-	new_tf->
+	new_tf->doc_freq = 1;
 
 	return new_tf;
 }
 
-void destroy_tf_t(tf_t *) {
-	free(tf_t->full_rep);
+void destroy_tf_t(void *tf) {
+	free(((tf_t *) tf)->full_rep);
 
-	free(tf_t);
+	free((tf_t *) tf);
 
 	return;
 }
@@ -308,7 +291,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 			free(full_page_data[add_hash]);
 
 			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0)
-				hashmap_freq->curr_freq++;
+				hashmap_freq->curr_term_freq++;
 			else { // reset features
 				hashmap_freq->curr_term_freq = 0;
 				hashmap_freq->curr_doc_id = *ID;
@@ -330,10 +313,10 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	free(phrase_len);
 
 	int *key_len = malloc(sizeof(int));
-	char **keys = (char **) keys__hashmap(word_freq_hash, key_len, is_m, *ID);
+	char **keys = (char **) keys__hashmap(term_freq, key_len, "m", is_m, *ID);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
-		tf_t *m_val = (tf_t *) get__hashmap(word_freq_hash, keys[count_sums], 0);
+		tf_t *m_val = (tf_t *) get__hashmap(term_freq, keys[count_sums], 0);
 		int key_freq = m_val->curr_term_freq;
 		sum_of_squares += key_freq * key_freq;
 
@@ -346,10 +329,10 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		if (m_val->full_rep_index + length > m_val->max_full_rep) {
 			m_val->max_full_rep *= 2;
 
-			m_val = realloc(m_val, sizeof(char) * m_val->max_full_rep);
+			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);
 		}
 
-		sprintf(m_val + sizeof(full_rep_index), "%s,%d|", *ID, freq_len);
+		sprintf(m_val->full_rep + sizeof(m_val->full_rep_index), "%s,%d|", *ID, freq_len);
 		m_val->full_rep_index += length - 1;
 	}
 	char *sum_square_char = malloc(sizeof(char) * 13);
@@ -357,7 +340,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 
 	sprintf(sum_square_char, " %d\n", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	check = fputs(sum_square_char, title_fp->runner);
+	fputs(sum_square_char, title_fp->runner);
 	pthread_mutex_unlock(&(title_fp->mutex));
 
 	free(sum_square_char);
