@@ -242,7 +242,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
 	total_bag_size += *ID_len - 1;
-	free(ID_len);
 
 	// get title
 	int *title_len = malloc(sizeof(int));
@@ -334,8 +333,24 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	char **keys = (char **) keys__hashmap(word_freq_hash, key_len, is_m, *ID);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
-		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums], 0);
+		tf_t *m_val = (tf_t *) get__hashmap(word_freq_hash, keys[count_sums], 0);
+		int key_freq = m_val->curr_term_freq;
 		sum_of_squares += key_freq * key_freq;
+
+		// update full_rep
+		// ID,freq|
+		int freq_len = (int) log10(key_freq) + 2;
+		int length = *ID_len + freq_len;
+
+		// make sure char has enough space
+		if (m_val->full_rep_index + length > m_val->max_full_rep) {
+			m_val->max_full_rep *= 2;
+
+			m_val = realloc(m_val, sizeof(char) * m_val->max_full_rep);
+		}
+
+		sprintf(m_val + sizeof(full_rep_index), "%s,%d|", *ID, freq_len);
+		m_val->full_rep_index += length - 1;
 	}
 	char *sum_square_char = malloc(sizeof(char) * 13);
 	memset(sum_square_char, '\0', sizeof(char) * 13);
@@ -344,8 +359,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	total_bag_size += strlen(sum_square_char);
 	check = fputs(sum_square_char, title_fp->runner);
 	pthread_mutex_unlock(&(title_fp->mutex));
-
-	if (check == -1) return -1;
 
 	free(sum_square_char);
 
