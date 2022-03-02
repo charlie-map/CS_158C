@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "hashmap.h"
 
 /*
@@ -165,10 +166,10 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 	return 0;
 }
 
-int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index) {
+int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index, int (*is_m)(void *, void *), void *m_cmp) {
 	while(ll_node) {
 		// also check to make sure the key has a value
-		if (!ll_node->ll_meat || !ll_node->key.key) {
+		if (!ll_node->ll_meat || !ll_node->key.key || !is_m(ll_node->ll_meat, m_cmp)) {
 			ll_node = ll_node->next;
 			continue;
 		}
@@ -188,7 +189,27 @@ int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index) {
 }
 
 // creates an array of all keys in the hash map
-void **keys__hashmap(hashmap *hash__m, int *max_key) {
+/*
+	Now has the option for a third paramater:
+		"m": check if the value matches a certain criteria based on a function:
+			int is_m(void *, void *)
+			 and a single input for a comparer (input NULL if not):
+			void *
+*/
+void **keys__hashmap(hashmap *hash__m, int *max_key, char *p, ...) {
+	int (*is_m)(void *) = NULL;
+	void *m_cmp = NULL;
+
+	va_list extra_param;
+	va_start(extra_param, p);
+
+	for (int check_p = 0; p[check_p]; check_p++) {
+		if (p[check_p] == 'm') {
+			is_m = va_arg(extra_param, int (*)(void *));
+			m_cmp = va_arg(extra_param, void *);
+		}
+	}
+
 	int key_index = 0;
 	*max_key = 16;
 	void **keys = malloc(sizeof(void *) * *max_key);
@@ -196,7 +217,7 @@ void **keys__hashmap(hashmap *hash__m, int *max_key) {
 	for (int find_keys = 0; find_keys < hash__m->hashmap__size; find_keys++) {
 		if (hash__m->map[find_keys]) {
 			// search LL:
-			key_index = ll_get_keys(hash__m->map[find_keys], &keys, max_key, key_index);
+			key_index = ll_get_keys(hash__m->map[find_keys], &keys, max_key, key_index, is_m, m_cmp);
 		}
 	}
 

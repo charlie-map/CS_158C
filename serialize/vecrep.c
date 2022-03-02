@@ -54,8 +54,7 @@ typedef struct SerializeObject {
 
 	trie_t *stopword_trie;
 
-	mutex_t *idf; // hashmap *idf
-	mutex_t *index_writer; // FILE *index_writer
+	mutex_t *term_freq; // has mutex_t for each word (crayyyyy)
 	mutex_t *title_writer; // FILE *title_writer
 
 	mutex_t *doc_bag_index;
@@ -67,7 +66,7 @@ typedef struct SerializeObject {
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
 	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
-	mutex_t *idf, mutex_t *index_writer, mutex_t *title_writer, int *doc_bag_length, mutex_t *doc_bag_index,
+	mutex_t *term_freq, mutex_t *title_writer, int *doc_bag_length, mutex_t *doc_bag_index,
 	int start_read_body, int end_read_body) {
 
 	serialize_t *new_ser = malloc(sizeof(serialize_t));
@@ -81,9 +80,7 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 
 	new_ser->stopword_trie = stopword_trie;
 
-	new_ser->idf = idf;
-
-	new_ser->index_writer = index_writer;
+	new_ser->term_freq = term_freq;
 	new_ser->title_writer = title_writer;
 
 	new_ser->doc_bag_length = doc_bag_length;
@@ -112,8 +109,8 @@ int main() {
 
 	socket_t *sock_data = get_socket(HOST, PORT);
 
-	// calculate idf for each term
-	hashmap *idf = make__hashmap(0, NULL, hashmap_destroy_idf);
+	// calculating term frequency for each term
+	hashmap *term_freq = make__hashmap(0, NULL, destroy_tf_t);
 
 	// initial header request
 	res *response = send_req(sock_data, "/pull_page_names", "POST", "-b", "name=$&passcode=$", REQ_NAME, REQ_PASSCODE);
@@ -160,10 +157,8 @@ int main() {
 		}
 	}
 
-	mutex_t *idf_mutex = malloc(sizeof(mutex_t));
-	*idf_mutex = newMutexLocker(idf);
-	mutex_t *index_writer_mutex = malloc(sizeof(mutex_t));
-	*index_writer_mutex = newMutexLocker(index_writer);
+	mutex_t *term_freq_mutex = malloc(sizeof(mutex_t));
+	*term_freq_mutex = newMutexLocker(term_freq);
 	mutex_t *title_writer_mutex = malloc(sizeof(mutex_t));
 	*title_writer_mutex = newMutexLocker(title_writer);
 
@@ -171,7 +166,7 @@ int main() {
 
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
 		serializers[thread_rip] = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
-			sock_mutex[thread_rip / 3], stopword_trie, idf_mutex, index_writer_mutex,
+			sock_mutex[thread_rip / 3], stopword_trie, term_freq_mutex,
 			title_writer_mutex, doc_bag_length, doc_bag_mutex, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
@@ -198,6 +193,10 @@ int main() {
 	fclose(title_writer);
 
 	trie_destroy(stopword_trie);
+
+	/* SAVE IDF AND CREATE A DIFFERENT PROGRAM FOR BELOW */
+
+	return 0;
 
 	// now we have idf for all terms, and the length of each bag of terms
 	// we can go back through the writer again and pull each document out one
@@ -259,8 +258,7 @@ int main() {
 
 		-- socket_t **sock_data (requires mutex locking)
 
-		-- hashmap *idf (requires mutex locking)
-		-- FILE *index_writer (requires mutex locking)
+		-- hashmap *term_freq (requires mutex locking)
 		-- FILE *title_writer (requires mutex locking)
 
 		-- int *doc_bag_length
@@ -323,8 +321,8 @@ void *data_read(void *meta_ptr) {
 			free(new_title);
 		}
 
-		pthread_mutex_lock(&(ser_pt->index_writer->mutex));
-		int new_doc_length = word_bag(ser_pt->index_writer, ser_pt->title_writer, stopword_trie, new_wiki_page_token, ser_pt->idf, &all_IDs[read_body]);
+		pthread_mutex_lock(&(ser_pt->term_freq->mutex));
+		int new_doc_length = word_bag(ser_pt->term_freq->runner, ser_pt->title_writer, stopword_trie, new_wiki_page_token, &all_IDs[read_body]);
 		
 		if (new_doc_length < 0) {
 			printf("\nWRITE ERR\n");
@@ -334,7 +332,7 @@ void *data_read(void *meta_ptr) {
 		pthread_mutex_lock(&(ser_pt->doc_bag_index->mutex));
 		(ser_pt->doc_bag_length)[(*(int *) (ser_pt->doc_bag_index->runner))++] = new_doc_length;
 		pthread_mutex_unlock(&(ser_pt->doc_bag_index->mutex));
-		pthread_mutex_unlock(&(ser_pt->index_writer->mutex));
+		pthread_mutex_unlock(&(ser_pt->term_freq->mutex));
 
 		destroy_token(new_wiki_page_token);
 		res_destroy(wiki_page);

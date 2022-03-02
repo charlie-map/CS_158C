@@ -29,6 +29,23 @@ int delimeter_check(char curr_char, char *delims) {
 	return 0;
 }
 
+mutex_t *mewtexLocker(void *payload) {
+	mutex_t *new_mutexer = malloc(sizeof(mutex_t));
+
+	new_mutexer->runner = payload;
+	new_mutexer->mutex = PTHREAD_MUTEX_INITIALIZER;
+
+	return new_mutexer;
+}
+
+void freeMewtexLocker(void *mutexer) {
+	free(((mutex_t *) mutexer)->runner);
+
+	free(mutexer);
+
+	return;
+}
+
 mutex_t newMutexLocker(void *payload) {
 	mutex_t new_mutexer = { .runner = payload, .mutex = PTHREAD_MUTEX_INITIALIZER };
 
@@ -184,11 +201,39 @@ void *is_block(void *hmap, char *tag) {
 	return get__hashmap((hashmap *) hmap, tag, 0);
 }
 
+tf_t *new_tf_t(char *ID) {
+	tf_t *new_tf = malloc(sizeof(tf_t));
+
+	new_tf->max_full_rep = 8; new_tf->full_rep_index = 0;
+	new_tf->full_rep = malloc(sizeof(char *) * new_tf->max_full_rep);
+
+	new_tf->curr_doc_id = ID;
+	new_tf->curr_term_freq = 1;
+
+	new_tf->
+
+	return new_tf;
+}
+
+void destroy_tf_t(tf_t *) {
+	free(tf_t->full_rep);
+
+	free(tf_t);
+
+	return;
+}
+
+int is_m(void *tf, void *extra) {
+	tf_t *tt = (tf_t *) tf;
+
+	return strcmp(tt->curr_doc_id, (char *) extra) == 0;
+}
+
 /* Update to wordbag:
 	Now index_fp, title_fp, and idf_hash need mutex locking,
 	so bring mutex attr with them
 */
-int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, mutex_t *idf_hash, char **ID) {
+int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, char **ID) {
 	int total_bag_size = 0;
 
 	// create title page:
@@ -208,9 +253,7 @@ int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_
 	fputs(*ID, title_fp->runner);
 	fputs(":", title_fp->runner);
 	fputs(title, title_fp->runner);
-	fputs("\n", title_fp->runner);
-	pthread_mutex_unlock(&(title_fp->mutex));
-
+	
 	free(title_len);
 	free(title);
 
@@ -239,9 +282,6 @@ int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_
 	free(page_data_len);
 	free(token_page_data);
 
-	// create hashmap representation:
-	hashmap *word_freq_hash = make__hashmap(0, NULL, destroy_hashmap_float);
-
 	int sum_of_squares = 0; // calculate sum of squares
 
 	// loop through full_page_data and for each word:
@@ -261,54 +301,37 @@ int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_
 
 		// get from word_freq_hash:
 		// get char * from idf and free full_page_data
-		char *freq_key = getKey__hashmap(idf_hash->runner, full_page_data[add_hash]);
-		int *hashmap_freq = get__hashmap(word_freq_hash, full_page_data[add_hash], 0);
-		idf_t *idf;
-		idf = freq_key ? get__hashmap(idf_hash->runner, full_page_data[add_hash], 0) : NULL;
+		char *prev_hash_key = (char *) getKey__hashmap(term_freq, full_page_data[add_hash]);
 
-		if (hashmap_freq) {
+		if (prev_hash_key) {
+			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], 0);
+
 			free(full_page_data[add_hash]);
-			(*hashmap_freq)++;
+
+			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0)
+				hashmap_freq->curr_freq++;
+			else { // reset features
+				hashmap_freq->curr_term_freq = 0;
+				hashmap_freq->curr_doc_id = *ID;
+
+				hashmap_freq->doc_freq++;
+			}
+
 			continue;
 		}
 
 		total_bag_size += phrase_len[add_hash];
 
-		hashmap_freq = malloc(sizeof(int));
-		*hashmap_freq = 1;
+		tf_t *new_tf = new_tf_t(*ID);
 
-		insert__hashmap(word_freq_hash, freq_key ? freq_key : full_page_data[add_hash], hashmap_freq, "", compareCharKey, NULL);
-		// check prev_idf_ID to make sure it doesn't match current index
-		pthread_mutex_lock(&(idf_hash->mutex));
-
-		if (idf && strcmp(idf->prev_idf_ID, *ID) == 0) { // skip (duplicate)
-			continue;
-		} else if (idf) { // add to current frequency
-			idf->document_freq++;
-			idf->prev_idf_ID = *ID;
-		} else {
-			idf = malloc(sizeof(idf_t));
-			idf->document_freq = 1;
-			idf->prev_idf_ID = *ID;
-			insert__hashmap(idf_hash->runner, freq_key ? freq_key : full_page_data[add_hash], idf, "", compareCharKey, destroyCharKey);
-		}
-
-		pthread_mutex_unlock(&(idf_hash->mutex));
-
-		if (freq_key)
-			free(full_page_data[add_hash]);
+		insert__hashmap(term_freq, full_page_data[add_hash], new_tf, "", compareCharKey, destroyCharKey);
 	}
 
 	free(word_number_max);
 	free(phrase_len);
 
 	int *key_len = malloc(sizeof(int));
-	char **keys = (char **) keys__hashmap(word_freq_hash, key_len);
-
-	// setup index file:
-	int check = fputs(*ID, index_fp->runner);
-
-	if (check == -1) return -1;
+	char **keys = (char **) keys__hashmap(word_freq_hash, key_len, is_m, *ID);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
 		int key_freq = *(int *) get__hashmap(word_freq_hash, keys[count_sums], 0);
@@ -317,44 +340,21 @@ int word_bag(mutex_t *index_fp, mutex_t *title_fp, trie_t *stopword_trie, token_
 	char *sum_square_char = malloc(sizeof(char) * 13);
 	memset(sum_square_char, '\0', sizeof(char) * 13);
 
-	sprintf(sum_square_char, " %d ", sum_of_squares);
+	sprintf(sum_square_char, " %d\n", sum_of_squares);
 	total_bag_size += strlen(sum_square_char);
-	check = fputs(sum_square_char, index_fp->runner);
+	check = fputs(sum_square_char, title_fp->runner);
+	pthread_mutex_unlock(&(title_fp->mutex));
 
 	if (check == -1) return -1;
 
 	free(sum_square_char);
 
-	// loop through keys and input word:freq pairs
-	for (int write_key = 0; write_key < *key_len; write_key++) {
-		int *key_freq = (int *) get__hashmap(word_freq_hash, keys[write_key], 0);
-
-		char *key_freq_str = malloc(sizeof(char) * 13);
-		memset(key_freq_str, '\0', sizeof(char) * 13);
-
-		sprintf(key_freq_str, ":%d ", *(int *) key_freq);
-
-		// add length of key_freq_str to bag_size:
-		total_bag_size += strlen(key_freq_str);
-
-		check = fputs(keys[write_key], index_fp->runner);
-		if (check == -1) return -1;
-		check = fputs(key_freq_str, index_fp->runner);
-		if (check == -1) return -1;
-
-		free(key_freq_str);
-	}
-
-	fputs("\n", index_fp->runner);
-	total_bag_size++;
-
 	free(keys);
 	free(key_len);
 
-	deepdestroy__hashmap(word_freq_hash);
 	free(full_page_data);
 
-	return total_bag_size;
+	return 0;
 }
 
 void destroy_hashmap_float(void *v) {
