@@ -293,7 +293,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0)
 				hashmap_freq->curr_term_freq++;
 			else { // reset features
-				hashmap_freq->curr_term_freq = 0;
+				hashmap_freq->curr_term_freq = 1;
 				hashmap_freq->curr_doc_id = *ID;
 
 				hashmap_freq->doc_freq++;
@@ -323,17 +323,18 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		// update full_rep
 		// ID,freq|
 		int freq_len = (int) log10(key_freq) + 2;
-		int length = *ID_len + freq_len;
+		int length = *ID_len + freq_len + 2;
 
 		// make sure char has enough space
-		if (m_val->full_rep_index + length > m_val->max_full_rep) {
+		if (m_val->full_rep_index + length + 1 > m_val->max_full_rep) {
 			m_val->max_full_rep *= 2;
 
 			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);
 		}
 
 		sprintf(m_val->full_rep + sizeof(m_val->full_rep_index), "%s,%d|", *ID, freq_len);
-		m_val->full_rep_index += length - 1;
+		m_val->full_rep_index += length;
+		m_val->full_rep[m_val->full_rep_index] = '\0';
 	}
 	char *sum_square_char = malloc(sizeof(char) * 13);
 	memset(sum_square_char, '\0', sizeof(char) * 13);
@@ -347,6 +348,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 
 	free(keys);
 	free(key_len);
+	free(ID_len);
 
 	free(full_page_data);
 

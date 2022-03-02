@@ -169,7 +169,7 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index, int (*is_m)(void *, void *), void *m_cmp) {
 	while(ll_node) {
 		// also check to make sure the key has a value
-		if (!ll_node->ll_meat || !ll_node->key.key || !is_m(ll_node->ll_meat, m_cmp)) {
+		if (!ll_node->ll_meat || !ll_node->key.key || (is_m && !is_m(ll_node->ll_meat, m_cmp))) {
 			ll_node = ll_node->next;
 			continue;
 		}

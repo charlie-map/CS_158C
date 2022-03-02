@@ -181,19 +181,72 @@ int main() {
 	}
 
 	free(serializers);
+	free(term_freq_mutex);
 
 	free(p_thread);
 	free(array_body);
 
 	res_destroy(response);
 
-	fclose(index_writer);
 	free(title_writer_mutex);
 	fclose(title_writer);
 
 	trie_destroy(stopword_trie);
 
-	/* SAVE IDF AND CREATE A DIFFERENT PROGRAM FOR BELOW */
+	/* SAVE term freq and idf AND CREATE A DIFFERENT PROGRAM FOR BELOW */
+	// in form:
+		// word DF:ID,freq|ID,freq|\n
+	int *word_len = malloc(sizeof(int));
+	char **words = (char **) keys__hashmap(term_freq, word_len, "");
+
+	for (int fp_word = 0; fp_word < *word_len; fp_word++) {
+		tf_t *dat = get__hashmap(term_freq, words[fp_word], 0);
+
+		int doc_freq_len = (int) log10(dat->doc_freq) + 2;
+		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
+		sprintf(doc_freq_str, "%d", dat->doc_freq);
+
+		printf("%s %d\n", words[fp_word], dat->doc_freq);
+
+		fputs(words[fp_word], index_writer);
+		fputc(' ', index_writer);
+		fputs(doc_freq_str, index_writer);
+
+		free(doc_freq_str);
+
+		fputc(':', index_writer);
+		fputs(dat->full_rep, index_writer);
+		fputc('\n', index_writer);
+	}
+	printf("%d\n", *word_len);
+
+	free(word_len);
+	free(words);
+	fclose(index_writer);
+
+	deepdestroy__hashmap(term_freq);
+
+	// free data:
+	for (int del_id = 0; del_id < *array_length; del_id++) {
+		free(all_IDs[del_id]);
+	}
+	free(all_IDs);
+
+	free(doc_bag_index);
+	free(doc_bag_mutex);
+	free(doc_bag_length);
+	free(array_length);
+
+	// free sockets
+	for (int free_socket = 0; free_socket < THREAD_NUMBER / 2; free_socket++) {
+		free(sock_mutex[free_socket]);
+
+		destroy_socket(*(socket_holder[free_socket]));
+		free(socket_holder[free_socket]);
+	}
+
+	free(sock_mutex);
+	free(socket_holder);
 
 	return 0;
 
@@ -218,30 +271,12 @@ int main() {
 
 	// destroy_cluster(cluster, K);
 
-	// // free data:
 	// for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
 	// 	free(all_IDs[f_feature_space]);
 	// 	destroy_hashmap_body(feature_space[f_feature_space]);
 	// }
 
 	// free(feature_space);
-	// free(doc_bag_index);
-	// free(doc_bag_mutex);
-	// free(doc_bag_length);
-	// free(array_length);
-
-	// free(all_IDs);
-
-	// // free sockets
-	// for (int free_socket = 0; free_socket < THREAD_NUMBER / 2; free_socket++) {
-	// 	free(sock_mutex[free_socket]);
-
-	// 	destroy_socket(*(socket_holder[free_socket]));
-	// 	free(socket_holder[free_socket]);
-	// }
-
-	// free(sock_mutex);
-	// free(socket_holder);
 
 	// return 0;
 }
