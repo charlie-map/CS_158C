@@ -206,8 +206,6 @@ int main() {
 		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
 		sprintf(doc_freq_str, "%d", dat->doc_freq);
 
-		printf("%s %d\n", words[fp_word], dat->doc_freq);
-
 		fputs(words[fp_word], index_writer);
 		fputc(' ', index_writer);
 		fputs(doc_freq_str, index_writer);

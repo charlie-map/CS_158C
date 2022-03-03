@@ -1,0 +1,1 @@
+gcc -g vecrep.c serialize.c token.c hashmap.c request.c stack.c trie.c k-means.c ../stemmer.c -pthread -lm

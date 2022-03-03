@@ -188,7 +188,8 @@ tf_t *new_tf_t(char *ID) {
 	tf_t *new_tf = malloc(sizeof(tf_t));
 
 	new_tf->max_full_rep = 8; new_tf->full_rep_index = 0;
-	new_tf->full_rep = malloc(sizeof(char *) * new_tf->max_full_rep);
+	new_tf->full_rep = malloc(sizeof(char) * new_tf->max_full_rep);
+	memset(new_tf->full_rep, '\0', sizeof(char) * new_tf->max_full_rep);
 
 	new_tf->curr_doc_id = ID;
 	new_tf->curr_term_freq = 1;
@@ -323,16 +324,16 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		// update full_rep
 		// ID,freq|
 		int freq_len = (int) log10(key_freq) + 2;
-		int length = *ID_len + freq_len + 2;
+		int length = *ID_len + freq_len;
 
 		// make sure char has enough space
-		if (m_val->full_rep_index + length + 1 > m_val->max_full_rep) {
+		while (m_val->full_rep_index + length + 1 > m_val->max_full_rep) {
 			m_val->max_full_rep *= 2;
 
 			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);
 		}
 
-		sprintf(m_val->full_rep + sizeof(m_val->full_rep_index), "%s,%d|", *ID, freq_len);
+		sprintf(m_val->full_rep + sizeof(char) * m_val->full_rep_index, "%s,%d|", *ID, key_freq);
 		m_val->full_rep_index += length;
 		m_val->full_rep[m_val->full_rep_index] = '\0';
 	}
