@@ -6,9 +6,8 @@
 
 #include "trie.h"
 #include "token.h"
-#include "k-means.h"
-#include "request.h"
-#include "hashmap.h"
+#include "../utils/request.h"
+#include "../utils/hashmap.h"
 #include "serialize.h"
 
 #define HOST getenv("WIKIREAD_HOST")
@@ -57,16 +56,13 @@ typedef struct SerializeObject {
 	mutex_t *term_freq; // has mutex_t for each word (crayyyyy)
 	mutex_t *title_writer; // FILE *title_writer
 
-	mutex_t *doc_bag_index;
-	int *doc_bag_length; // int *doc_bag_length
-
 	int start_read_body;
 	int end_read_body;
 } serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
 	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
-	mutex_t *term_freq, mutex_t *title_writer, int *doc_bag_length, mutex_t *doc_bag_index,
+	mutex_t *term_freq, mutex_t *title_writer,
 	int start_read_body, int end_read_body) {
 
 	serialize_t *new_ser = malloc(sizeof(serialize_t));
@@ -82,9 +78,6 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 
 	new_ser->term_freq = term_freq;
 	new_ser->title_writer = title_writer;
-
-	new_ser->doc_bag_length = doc_bag_length;
-	new_ser->doc_bag_index = doc_bag_index;
 
 	new_ser->start_read_body = start_read_body;
 	new_ser->end_read_body = end_read_body;
@@ -118,13 +111,6 @@ int main() {
 	// pull array
 	int *array_length = malloc(sizeof(int));
 	char **array_body = handle_array(res_body(response), array_length);
-
-	// each document length (in serialized form)
-	int *doc_bag_length = malloc(sizeof(int) * *array_length);
-	int *doc_bag_index = malloc(sizeof(int));
-	*doc_bag_index = 0;
-	mutex_t *doc_bag_mutex = malloc(sizeof(mutex_t));
-	*doc_bag_mutex = newMutexLocker(doc_bag_index);
 
 	char **all_IDs = malloc(sizeof(char *) * *array_length);
 	printf("\nCurrent wiki IDs: %d\n", *array_length);
@@ -167,7 +153,7 @@ int main() {
 	for (int thread_rip = 0; thread_rip < THREAD_NUMBER; thread_rip++) {
 		serializers[thread_rip] = create_serializer(all_IDs, array_body, array_length, socket_holder[thread_rip / 3],
 			sock_mutex[thread_rip / 3], stopword_trie, term_freq_mutex,
-			title_writer_mutex, doc_bag_length, doc_bag_mutex, thread_rip * doc_per_thread,
+			title_writer_mutex, thread_rip * doc_per_thread,
 			thread_rip == THREAD_NUMBER - 1 ? *array_length : (thread_rip + 1) * doc_per_thread);
 
 		pthread_create(&p_thread[thread_rip], NULL, data_read, serializers[thread_rip]);
@@ -230,9 +216,6 @@ int main() {
 	}
 	free(all_IDs);
 
-	free(doc_bag_index);
-	free(doc_bag_mutex);
-	free(doc_bag_length);
 	free(array_length);
 
 	// free sockets
@@ -358,9 +341,6 @@ void *data_read(void *meta_ptr) {
 			exit(1);
 		}
 
-		pthread_mutex_lock(&(ser_pt->doc_bag_index->mutex));
-		(ser_pt->doc_bag_length)[(*(int *) (ser_pt->doc_bag_index->runner))++] = new_doc_length;
-		pthread_mutex_unlock(&(ser_pt->doc_bag_index->mutex));
 		pthread_mutex_unlock(&(ser_pt->term_freq->mutex));
 
 		destroy_token(new_wiki_page_token);

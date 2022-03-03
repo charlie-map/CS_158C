@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "hashmap.h"
+#include "../utils/hashmap.h"
 #include "trie.h"
 
 // default next for simple_payload

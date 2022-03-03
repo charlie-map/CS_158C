@@ -1,8 +1,8 @@
 #ifndef __K_MEANS_L__
 #define __K_MEANS_L__
 
-#include "serialize.h"
-#include "hashmap.h"
+#include "../serialize/serialize.h"
+#include "../utils/hashmap.h"
 
 typedef struct Cluster {
 	int max_doc_pos, doc_pos_index;
