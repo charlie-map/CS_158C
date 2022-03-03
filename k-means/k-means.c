@@ -11,7 +11,7 @@
 // the two documents are
 float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, float centroid_sqrt_mag) {
 	int *centroid_key_len = malloc(sizeof(int));
-	char **centroid_key = (char **) keys__hashmap(doc, centroid_key_len);
+	char **centroid_key = (char **) keys__hashmap(doc, centroid_key_len, "");
 
 	float dot_product = 0;
 	for (int calc_dp = 0; calc_dp < *centroid_key_len; calc_dp++) {
@@ -154,7 +154,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 		int cluster_size = centroids[find_mean_centroid]->doc_pos_index;
 
 		int *cluster_word_len = malloc(sizeof(int));
-		char **cluster_word = (char **) keys__hashmap(centroids[find_mean_centroid]->centroid, cluster_word_len);
+		char **cluster_word = (char **) keys__hashmap(centroids[find_mean_centroid]->centroid, cluster_word_len, "");
 
 		// for each word in cluster, add up tf-idf from each document in cluster and devide by number of documents
 		for (int word_mean = 0; word_mean < *cluster_word_len; word_mean++) {
@@ -186,7 +186,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 // take all values in m2 and copy them into m1
 int copy__hashmap(hashmap *m1, hashmap *m2) {
 	int *m2_value_len = malloc(sizeof(int));
-	char **m2_words = (char **) keys__hashmap(m2, m2_value_len);
+	char **m2_words = (char **) keys__hashmap(m2, m2_value_len, "");
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 

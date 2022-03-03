@@ -1,0 +1,1 @@
+gcc -g vecrep.c serialize.c token.c ../utils/hashmap.c ../utils/request.c ../utils/stack.c trie.c ../utils/helper.c ../stemmer.c -pthread -lm

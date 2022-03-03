@@ -1,83 +1,264 @@
-2:Ball
-3:Spain
-4:Europe
-5:Greater Caucasus
-6:Abortion debate
-7:Abortion in the United States by state
-8:Minors and abortion
-9:Main Page
-10:Potato
-11:Bishōnen 
-12:Alan Turing
-13:Langton's ant
-14:Nicholas II of Russia
-15:Ancient Greece
-16:Ancient Rome
-17:Chicago Fire
-18:Great Chicago Fire
-19:Marsden Rock
-20:Tree frog
-21:Wiki
-22:Final Fantasy XIII-2 
-23:Lacrosse
-24:Basketball
-25:Virginia Cavaliers men's basketball
-26:Virginia Cavaliers
-27:Apple Inc.
-28:Cyclone Batsirai
-29:Wikipedia
-30:Horizon
-31:Seam carving
-32:-means clusteringk 
-33:Fred Hampton
-34:Roman Empire
-35:Augustus
-36:Assassination of Julius Caesar
-37:Julius Caesar
-38:Crossing the Rubicon
-39:René Magritte
-40:Barbary Wars
-41:Gustav IV Adolf
-42:Gustav III
-43:Wikipedia:About
-44: (video game)Rust 
-45:EOKA
-46:McNab
-47:Clan Macnab
-48:Palmer Raids
-49: (film)Reds 
-50:Communist Labor Party of America
-51:Communist Party USA
-52:Socialist Party of America
-53:Social Democrats, USA
-54:Democratic Socialists of America
-55:Siege of Vicksburg
-56:Farmer–Labor Party
-57:Populism
-58:Communism
-59:2020 United States presidential election
-60:Democratic Party (United States)
-61:Nationwide opinion polling for the 2020 United States presidential election
-62:Jo Jorgensen
-63:Libertyville, Illinois
-64:William Jennings Bryan
-65:1896 United States presidential election
-66:1900 United States presidential election
-67:1904 United States presidential election
-68:1908 United States presidential election
-69:People's Party (United States)
-70:Garret Hobart
-71:Thomas E. Watson
-72:Charlottesville, Virginia
-73:Battle of Rio Hill
-74:Ukraine
-75:Revolution of Dignity
-76: (magazine)Documents 
-77: (film)Detachment 
-78:Partition of a set
-79:C data types
-80:Russo-Ukrainian War
-81:C standard library
-82:C
-83:Islamic Emirate of Afghanistan (1996–2001)
-84:Islamic State of Afghanistan
+200:Summit (supercomputer) 1157
+233:Prepared statement 7267
+101:Neanderthal 724453
+35:Augustus 217011
+201:COVID-19 pandemic 416250
+134:Jewish history 144249
+68:1908 United States presidential election 48422
+167:Algorithm 157178
+202:2022 Winter Olympics 320248
+36:Assassination of Julius Caesar 35308
+2:Ball 4471
+234:SQL injection 43032
+69:People's Party (United States) 79478
+135:Israelites 51133
+102:Gary Thomas Rowe Jr. 6501
+203:Olympic flame 35907
+168:Tonga 58447
+235:Character encoding 42871
+37:Julius Caesar 194812
+103:Anonymity 36913
+204:Olympic Games ceremony 49598
+3:Spain 271652
+104:Funeral 138172
+70:Garret Hobart 52642
+38:Crossing the Rubicon 967
+236:Express.js 453
+205:2016 Summer Olympics opening ceremony 10311
+169:Pteropus  126876
+4:Europe 202334
+71:Thomas E. Watson 14345
+206:Kinetic art 29630
+39:René Magritte 24717
+237:Teru (singer) 1052
+5:Greater Caucasus 2112
+105:Human 381189
+207:Op art 4774
+72:Charlottesville, Virginia 44154
+238:EFL Cup 30076
+136:Kingdom of Israel (united monarchy) 31069
+40:Barbary Wars 14963
+170:Rosette Nebula 1127
+239:FA Cup 93159
+6:Abortion debate 76842
+240:Zviad Gamsakhurdia 31071
+106:Homo  62832
+73:Battle of Rio Hill 6823
+41:Gustav IV Adolf 3705
+137:History of ancient Israel and Judah 53737
+208:Optical illusion 32880
+171:Lists of astronomical objects 270
+241:1852 United States presidential election 28282
+107:Homo floresiensis  34691
+7:Abortion in the United States by state 147317
+209:Demographics of Israel 59437
+138:History of the Jews and Judaism in the Land of Israel 226713
+242:1914 United States elections 738
+74:Ukraine 453011
+108:Ouranopithecus  2620
+243:1914 United States Senate elections 127843
+75:Revolution of Dignity 447742
+139:HPV vaccine 377227
+172:Cosmos: A Spacetime Odyssey  36516
+210:Grammatical gender 360218
+8:Minors and abortion 19147
+173:Andromeda–Milky Way collision 3969
+42:Gustav III 20207
+140:Gardasil 40576
+244:William Howard Taft 395850
+211:Priority queue 44078
+76: (magazine)Documents  580
+212:Smoothsort 8264
+109:Shanidar Cave 27101
+9:Main Page 667
+245:Pleiades 16995
+174:United Nations Partition Plan for Palestine 160520
+213:musl 545
+43:Wikipedia:About 32134
+77: (film)Detachment  2595
+141:Apolo Ohno 72223
+78:Partition of a set 10822
+246:Robert A. Taft 73924
+44: (video game)Rust  37496
+110:Early European modern humans 105445
+214:Linux kernel 427524
+175:Swarm intelligence 20676
+247:Taft family 64137
+10:Potato 376273
+79:C data types 37312
+215:GNU Compiler Collection 25737
+142:Shani Davis 22027
+45:EOKA 68589
+248:Orlow W. Chapman 252
+11:Bishōnen  6850
+111:Venus figurine 8779
+176:Carboniferous 25009
+216:C (programming language) 61479
+249:Charles H. Aldrich 491
+143: (Obioma novel)The Fishermen  655
+80:Russo-Ukrainian War 1484971
+217:Dennis Ritchie 15835
+112:Gravettian 9131
+46:McNab 515
+218:ALTRAN 2052
+144:Chigozie Obioma 5702
+81:C standard library 15498
+250:Lawrence Maxwell Jr. 482
+113:Boomerang 41796
+219:Assembly language 141460
+12:Alan Turing 136720
+177:Paleozoic 7669
+251:Holmes Conrad 636
+47:Clan Macnab 2735
+145:The Art of Computer Programming  19747
+220:High-level programming language 9965
+48:Palmer Raids 5933
+114:Art of the Upper Paleolithic 7432
+13:Langton's ant 3382
+252:Solicitor General of the United States 12540
+115:Behavioral modernity 44060
+82:C 6731
+221:Scala (programming language) 113243
+253:Lloyd Wheaton Bowers 363
+49: (film)Reds  11955
+146:Israeli West Bank barrier 227185
+14:Nicholas II of Russia 211252
+222:Currying 49902
+178:Permian–Triassic extinction event 95333
+116:Recent African origin of modern humans 85847
+223:Battle of San Juan Hill 40026
+83:Islamic Emirate of Afghanistan (1996–2001) 31813
+117:Mitochondrial Eve 54409
+254:Scarlett O'Hara 15596
+50:Communist Labor Party of America 4662
+179:Trilobite 125065
+147:Ray tracing (graphics) 85342
+15:Ancient Greece 129716
+224:General of the Armies 51900
+118:Timeline of human evolution 32142
+84:Islamic State of Afghanistan 3026
+180:Pangaea 16865
+255:Messier 82 4012
+51:Communist Party USA 79772
+148:Delaunay triangulation 15128
+256:Johann Elert Bode 2363
+16:Ancient Rome 360351
+225:John J. Pershing 141935
+119:Synapsid 18179
+85:Tripoli 28892
+52:Socialist Party of America 375131
+257:Titius–Bode law 20038
+17:Chicago Fire 249
+149:2023 FIFA Women's World Cup qualification (UEFA) 33350
+86:Post-micturition convulsion syndrome 156
+53:Social Democrats, USA 85172
+226:William McKinley 250974
+120:Life 192375
+18:Great Chicago Fire 35406
+181:Appalachian Mountains 35224
+87:French language in the United States 14455
+227:Leon Czolgosz 10811
+258:Untitled Goose Game  24894
+54:Democratic Socialists of America 90324
+228:Spanish–American War 235568
+55:Siege of Vicksburg 33095
+150:Determinant 254605
+259:VAX-11 9739
+182:Caledonian orogeny 2739
+260:MicroVAX 13855
+19:Marsden Rock 9813
+183:Gondwana 29448
+56:Farmer–Labor Party 24611
+229:Philippine Revolution 60930
+261:AMD Am2900 3261
+121:Video game 432624
+88: (film)Charlie and the Chocolate Factory  105737
+230:Theodore Roosevelt 697946
+20:Tree frog 509
+151: (film)Black Panther  570769
+89:Willy Wonka &amp; the Chocolate Factory  37000
+122:Social realism 33775
+231:Boeing 757 103572
+21:Wiki 65989
+152:Spanish football league system 2485
+262:Pixar Image Computer 2927
+232:Blue dasher 2636
+184:L-system 15009
+57:Populism 489193
+263:Computer Animation Production System 3265
+123:Ashcan School 5270
+153:Divisiones Regionales de Fútbol 2503
+264:Yusuf Karamanli 1476
+90:Utah &amp; Ether 10102
+22:Final Fantasy XIII-2  68375
+265:Francisco Franco 266485
+185:Trump peace plan 155991
+124:Bombing of Guernica 53240
+58:Communism 355300
+154:Divisiones Regionales de Fútbol in the Basque Country 12357
+186:Israeli settlement 439895
+59:2020 United States presidential election 996531
+125:-d treek  27251
+91:Wikipedia:Featured articles 14541
+155:Black Lives Matter 628496
+92:Irritator  59550
+126:List of prime ministers of Israel 6308
+23:Lacrosse 94835
+187:Woody Harrelson 23034
+156:Refrigerated container 2114
+127:Israeli Labor Party 33445
+60:Democratic Party (United States) 464699
+188:Charles Harrelson 5980
+93:Edward Hopper 107265
+24:Basketball 128096
+157:Moons of Jupiter 35310
+128:Knesset 15300
+61:Nationwide opinion polling for the 2020 United States presidential election 415902
+189:Tobias Beckett 2579
+158:Simon Marius 3108
+94:Apollo 15 postal covers incident 77923
+159:Galilean moons 26209
+25:Virginia Cavaliers men's basketball 44897
+190:Cosmos: Possible Worlds  7504
+129:St. Anne's-Belfield School 1464
+62:Jo Jorgensen 11134
+160:Alberto Fujimori 97288
+95:Jack the Ripper: The Final Solution  22343
+191:Cosmos: A Personal Voyage  9324
+26:Virginia Cavaliers 24354
+130:Nat Friedman 1223
+63:Libertyville, Illinois 7899
+161:Annexation of the Jordan Valley 8777
+96:Galaxy 148870
+192:Neil deGrasse Tyson 52061
+131:Matthew Swift 3829
+162:Frosty 459
+163:Frosty (frozen dairy dessert) 126
+27:Apple Inc. 700100
+132:Oslo Accords 47018
+193:Riverdale, Bronx 69435
+97:Quasar 71483
+194:Wordle  78546
+28:Cyclone Batsirai 74911
+164:List of space stations 15536
+64:William Jennings Bryan 231122
+133:Jews 269327
+98:Large quasar group 2270
+195:Majjhima Nikāya 993
+165:A* search algorithm 25155
+166:Heuristic (computer science) 5111
+196:Athenea del Castillo 1369
+29:Wikipedia 526411
+197:Computer science 94382
+65:1896 United States presidential election 96229
+198:Transactional Synchronization Extensions 11183
+199:Fugaku (supercomputer) 4346
+99:Galaxy filament 7622
+30:Horizon 25420
+66:1900 United States presidential election 55781
+100:Denisovan 50989
+31:Seam carving 4897
+67:1904 United States presidential election 20128
+32:-means clusteringk  61987
+33:Fred Hampton 66062
+34:Roman Empire 638837
