@@ -18,7 +18,8 @@ int main() {
 	
 	// now we have bags for all terms, and the length of each bag of terms
 	// we can go back through the writer again and pull each document out one at a time
-	hashmap_body_t **feature_space = deserialize("../serialize/predocbags.txt", DTF_THRESHOLD);
+	hashmap *doc_map = deserialize_title("../serialize/title.txt");
+	deserialize_bag("../serialize/predocbags.txt", DTF_THRESHOLD);
 
 	// start k-means to calculate clusters
 	// cluster_t **cluster = k_means(feature_space, *array_length, idf, K, CLUSTER_THRESHOLD);

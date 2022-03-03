@@ -7,6 +7,7 @@
 
 #include "serialize.h"
 #include "../stemmer.h"
+#include "../utils/helper.h"
 
 struct IDF_Track {
 	char *prev_idf_ID; // last document to be added (for checking dupes)

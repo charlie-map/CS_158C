@@ -16,6 +16,7 @@
 #include <netdb.h>
 
 #include "stack.h"
+#include "helper.h"
 #include "request.h"
 
 #define MAXLINE 4096
