@@ -4,6 +4,18 @@
 #include "deserialize.h"
 #include "../utils/helper.h"
 
+hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
+	hashmap_body_t *hm = (hashmap_body_t *) malloc(sizeof(hashmap_body_t));
+
+	hm->id = id;
+	hm->title = title;
+
+	hm->mag = mag;
+	hm->sqrt_mag = sqrt(mag);
+
+	return hm;
+}
+
 hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 	FILE *index = fopen(title_reader, "r");
 
@@ -14,24 +26,33 @@ hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 	}
 
 	// create hashmap store
-	int hm_body_index = 0;
-	*max_hm_body = 8;
-	hashmap_body_t **hm_body = malloc(sizeof(hashmap_body_t) * *max_hm_body);
+	int hm_body_index = 0; *max_hm_body = 8;
+	hashmap_body_t **hm_body = malloc(sizeof(hashmap_body_t *) * *max_hm_body);
 
 	size_t line_buffer_size = sizeof(char) * 8;
 	char *line_buffer = malloc(line_buffer_size);
 
 	int *row_num = malloc(sizeof(int)), **split_row_word_len = malloc(sizeof(int *));
 
-	while (getline(&line_buffer, &line_buffer_size, index) != -1) {
+	int line_buffer_length = 0;
+	while ((line_buffer_length = getline(&line_buffer, &line_buffer_size, index)) != -1) {
 		char **split_row = split_string(line_buffer, ':', row_num, "-r-l", num_is_range, split_row_word_len);
 
+		int id_mag_length = strlen(split_row[0]) + strlen(split_row[*row_num - 1]);
 		// now pull out the different components into a hashmap value:
-		int doc_ID = atoi(split_row[0]);
-		free(split_row[0]);
+		char *doc_ID = split_row[0];
 
-		// find split point between title and the maginitude
+		float mag = (float) split_row[*row_num - 1];
+		free(split_row[*row_num - 1]);
 
+		char *doc_title = malloc(sizeof(char) * id_mag_length);
+		strcpy(doc_title, split_row[1]);
+
+		for (int cp_doc_title = 2; cp_doc_title < *row_num - 1; cp_doc_title++) {
+			strcat(doc_title, split_row[cp_doc_title]);
+		}
+
+		hm_body[hm_body_index] = create_hashmap_body(doc_ID, doc_title, mag);
 	}
 
 	return documents;
@@ -39,6 +60,7 @@ hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 
 void destroy_hashmap_body(hashmap_body_t *body_hash) {
 	free(body_hash->id);
+	free(body_hash->title);
 
 	deepdestroy__hashmap(body_hash->map);
 
