@@ -9,27 +9,6 @@
 #include "../stemmer.h"
 #include "../utils/helper.h"
 
-struct IDF_Track {
-	char *prev_idf_ID; // last document to be added (for checking dupes)
-	int document_freq; // occurrences of documents that contain term
-};
-
-void hashmap_destroy_idf(void *p) {
-	free((idf_t *) p);
-
-	return;
-}
-
-// create index structure
-int delimeter_check(char curr_char, char *delims) {
-	for (int check_delim = 0; delims[check_delim]; check_delim++) {
-		if (delims[check_delim] == curr_char)
-			return 1;
-	}
-
-	return 0;
-}
-
 mutex_t newMutexLocker(void *payload) {
 	mutex_t new_mutexer = { .runner = payload, .mutex = PTHREAD_MUTEX_INITIALIZER };
 

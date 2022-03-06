@@ -14,6 +14,16 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 	return arr;
 }
 
+// create index structure
+int delimeter_check(char curr_char, char *delims) {
+	for (int check_delim = 0; delims[check_delim]; check_delim++) {
+		if (delims[check_delim] == curr_char)
+			return 1;
+	}
+
+	return 0;
+}
+
 /*
 	goes through a char * to create an array of char * that are split
 	based on the delimeter character. If the string was:

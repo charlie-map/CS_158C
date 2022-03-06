@@ -345,6 +345,7 @@ int delete__hashmap(hashmap *hash__m, void *key) {
 		// extract parent from the hashmap:
 		hash__m->map[mapPos] = ll_search;
 
+		ll_parent->next = NULL;
 		ll_destroy(ll_parent, hash__m->destroy);
 
 		return 0;
@@ -358,6 +359,7 @@ int delete__hashmap(hashmap *hash__m, void *key) {
 			// extract the key from the linked list
 			ll_parent->next = ll_next(ll_search);
 
+			ll_search->next = NULL;
 			ll_destroy(ll_search, hash__m->destroy);
 
 			return 0;
