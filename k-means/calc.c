@@ -22,7 +22,7 @@ int main() {
 	char **word_bag = deserialize("../serialize/predocbags.txt", doc_map, word_bag_len);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(doc_map, word_bag, *word_bag_len, K, CLUSTER_THRESHOLD);
+	cluster_t **cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
 
 	// for (int check_cluster = 0; check_cluster < K; check_cluster++) {
 	// 	printf("-----Check docs on %d-----\n", check_cluster + 1);
