@@ -312,7 +312,7 @@ void *data_read(void *meta_ptr) {
 
 		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
-		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
+		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page), array_body[read_body]);
 
 		// check title for any extra components:
 		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");

@@ -5,7 +5,7 @@
 #include "token.h"
 
 void *resize_arraylist(void *array, int *max_size, int current_index, size_t singleton_size) {
-	if (current_index == *max_size) {
+	while (current_index >= *max_size) {
 		*max_size *= 2;
 
 		array = realloc(array, singleton_size * *max_size);
@@ -25,6 +25,10 @@ struct Token {
 	// the attribute name is always an even position and
 	// the attribute itself is odd
 
+	int children_data_pos; // where the children occur within the
+		// overall scheme of this token
+		// ** mainly for token_read_all_data() to ensure the data
+		// is read from the correct position
 	int *max_children, children_index;
 	struct Token **children; // for nest children tags
 
@@ -450,23 +454,17 @@ tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **cur
 	int max_attr_tag_value = 8, attr_tag_value_index = 0;
 	memset(attr_tag_value, '\0', 8);
 
-	int is_img = strcmp(main_tag, "img") == 0;
-	int has_closure = -1;
-	int closure_close_tag_counter = search_token; // ensures checking the correct tag position
-
 	tag_reader tag_read;
 
 	// searching for attributes
 	while ((*curr_line)[search_token] != '>') {
-		has_closure = (*curr_line)[search_token] == '/' ? closure_close_tag_counter : has_closure;
-		closure_close_tag_counter++;
 
 		if ((*curr_line)[search_token] == '\n') {
-			search_token = 0;
-
 			if (!file)
 				str_read += (search_token + 1) * sizeof(char);
 			read_newline(curr_line, buffer_size, file, str_read);
+
+			search_token = 0;
 		}
 
 		// skip not wanted characters
@@ -544,12 +542,12 @@ tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **cur
 	add_token_children(parent_tree, new_tree);
 
 	tag_read.new_search_token = search_token + 1;
-	tag_read.type = is_img || has_closure + 1 == closure_close_tag_counter ? 1 : 0;
+	tag_read.type = (*curr_line)[search_token - 1] == '/';
 	tag_read.update_str_read = str_read;
 	return tag_read;
 }
 
-int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
+int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 	int search_token = 0;
 
 	size_t *buffer_size = malloc(sizeof(size_t));
@@ -612,7 +610,7 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 	'f' for file reading
 	's' for char * reading
 */
-token_t *tokenize(char reader_type, char *filename) {
+token_t *tokenize(char reader_type, char *filename, char *ID) {
 	FILE *file = NULL;
 
 	if (reader_type == 'f')
@@ -622,7 +620,7 @@ token_t *tokenize(char reader_type, char *filename) {
 	strcpy(root_tag, "root");
 	token_t *curr_tree = create_token(root_tag, NULL);
 
-	tokenizeMETA(file, filename, curr_tree);
+	tokenizeMETA(file, filename, curr_tree, ID);
 
 	if (file)
 		fclose(file);

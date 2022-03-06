@@ -58,16 +58,6 @@ int res_destroy(res *re) {
 	return 0;
 }
 
-void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
-	while (curr_index >= *max_len) {
-		*max_len *= 2;
-
-		arr = realloc(arr, singleton_size * *max_len);
-	}
-	
-	return arr;
-}
-
 void sigchld_handler(int s) {
 	// waitpid() might overwrite errno, so we save and restore it:
 	int saved_errno = errno;

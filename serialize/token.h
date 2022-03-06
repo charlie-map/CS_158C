@@ -3,7 +3,7 @@
 
 typedef struct Token token_t;
 
-token_t *tokenize(char reader_type, char *filename);
+token_t *tokenize(char reader_type, char *filename, char *ID);
 
 token_t **token_children(token_t *parent);
 token_t *grab_token_parent(token_t *curr_token);
