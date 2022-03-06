@@ -18,9 +18,7 @@
 
 #define THREAD_NUMBER 8
 
-#define K 8
-#define DTF_THRESHOLD 0
-#define CLUSTER_THRESHOLD 2
+#define DTF_THRESHOLD 2
 
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
@@ -188,6 +186,14 @@ int main() {
 	for (int fp_word = 0; fp_word < *word_len; fp_word++) {
 		tf_t *dat = get__hashmap(term_freq, words[fp_word], 0);
 
+		// check that the term has a high enough document frequency
+		if (dat->doc_freq < DTF_THRESHOLD) {
+			// remove the key and value from the hashmap
+			delete__hashmap(term_freq, words[fp_word]);
+
+			continue;
+		}
+
 		int doc_freq_len = (int) log10(dat->doc_freq) + 2;
 		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
 		sprintf(doc_freq_str, "%d", dat->doc_freq);
@@ -230,36 +236,6 @@ int main() {
 	free(socket_holder);
 
 	return 0;
-
-	// now we have idf for all terms, and the length of each bag of terms
-	// we can go back through the writer again and pull each document out one
-	// at a time and recalculate each term frequency with the new idf value
-	// FILE *old_reader = fopen("predocbags.txt", "r");
-	// hashmap_body_t **feature_space = word_bag_idf(old_reader, idf, doc_bag_length, *array_length, DTF_THRESHOLD);
-
-	// fclose(old_reader);
-
-	// // start k-means to calculate clusters
-	// cluster_t **cluster = k_means(feature_space, *array_length, idf, K, CLUSTER_THRESHOLD);
-
-	// for (int check_cluster = 0; check_cluster < K; check_cluster++) {
-	// 	printf("-----Check docs on %d-----\n", check_cluster + 1);
-
-	// 	for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
-	// 		printf("ID: %s\n", feature_space[cluster[check_cluster]->doc_pos[read_cluster_doc]]->id);
-	// 	}
-	// }
-
-	// destroy_cluster(cluster, K);
-
-	// for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
-	// 	free(all_IDs[f_feature_space]);
-	// 	destroy_hashmap_body(feature_space[f_feature_space]);
-	// }
-
-	// free(feature_space);
-
-	// return 0;
 }
 
 /*
