@@ -3,6 +3,7 @@
 
 #include "../serialize/serialize.h"
 #include "../utils/hashmap.h"
+#include "deserialize.h"
 
 typedef struct Cluster {
 	int max_doc_pos, doc_pos_index;

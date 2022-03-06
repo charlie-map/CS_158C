@@ -1,8 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 #include "deserialize.h"
 #include "../utils/helper.h"
+
+void destroy_hashmap_float(void *v) {
+	free((float *) v);
+
+	return;
+}
 
 hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 	hashmap_body_t *hm = (hashmap_body_t *) malloc(sizeof(hashmap_body_t));
@@ -13,10 +21,16 @@ hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 	hm->mag = mag;
 	hm->sqrt_mag = sqrt(mag);
 
+	hm->map = make__hashmap(0, NULL, destroy_hashmap_float);
+
 	return hm;
 }
 
-hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
+void hm_destroy_hashmap_body(void *hm_body) {
+	return destroy_hashmap_body((hashmap_body_t *) hm_body);
+}
+
+hashmap *deserialize_title(char *title_reader) {
 	FILE *index = fopen(title_reader, "r");
 
 	if (!index) {
@@ -25,10 +39,8 @@ hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 		printf("\033[0;37m");
 	}
 
+	hashmap *documents = make__hashmap(0, NULL, hm_destroy_hashmap_body);
 	// create hashmap store
-	int hm_body_index = 0; *max_hm_body = 8;
-	hashmap_body_t **hm_body = malloc(sizeof(hashmap_body_t *) * *max_hm_body);
-
 	size_t line_buffer_size = sizeof(char) * 8;
 	char *line_buffer = malloc(line_buffer_size);
 
@@ -42,7 +54,7 @@ hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 		// now pull out the different components into a hashmap value:
 		char *doc_ID = split_row[0];
 
-		float mag = (float) split_row[*row_num - 1];
+		float mag = atof(split_row[*row_num - 1]);
 		free(split_row[*row_num - 1]);
 
 		char *doc_title = malloc(sizeof(char) * id_mag_length);
@@ -52,7 +64,7 @@ hashmap_body_t **deserialize_title(char *title_reader, int *max_hm_body) {
 			strcat(doc_title, split_row[cp_doc_title]);
 		}
 
-		hm_body[hm_body_index] = create_hashmap_body(doc_ID, doc_title, mag);
+		insert__hashmap(documents, doc_ID, create_hashmap_body(doc_ID, doc_title, mag), "", compareCharKey, NULL);
 	}
 
 	return documents;
@@ -78,8 +90,9 @@ int destroy_split_string(char **split_string, int *split_string_len) {
 	return 0;
 }
 
-hashmap *deserialize(char *index_reader, hashmap *docs, char *** words, int dtf_drop_threshold) {
-	hashmap *doc_major_map = make__hashmap(0, NULL, destroy_hashmap_body);
+char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
+	int words_index = 0; *max_words = 132;
+	char **words = malloc(sizeof(char) * *max_words);
 
 	FILE *index = fopen(index_reader, "r");
 
@@ -95,11 +108,31 @@ hashmap *deserialize(char *index_reader, hashmap *docs, char *** words, int dtf_
 	while (getline(&line_buffer, &line_buffer_size, index) != -1) {
 		// splice bag by multi_delimeters:
 		// use " " and ":" and "|" as delimeters
-		int *word_bag_words_max = malloc(sizeof(int));
-		char **word_bag_words = split_string(word_bag, 0, word_bag_words_max, "-d-r", delimeter_check, " :", num_is_range);
+		int *line_sub_max = malloc(sizeof(int));
+		char **line_subs = split_string(line_buffer, 0, line_sub_max, "-d-r", delimeter_check, " :,", num_is_range);
 
-		
+		words[words_index] = line_subs[0];
+
+		// ladder 9:124,1|93,1|245,2|190,1|193,2|19,1|104,1|55,3|57,2|
+		// go through each document and compute normalized (using document frequency) term frequencies
+		float doc_freq = atof(line_subs[1]);
+		free(line_subs[1]);
+
+		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq++) {
+			char *doc_ID = line_subs[read_doc_freq];
+
+			hashmap_body_t *doc = get__hashmap(docs, doc_ID, 0);
+
+			// calculate term_frequency / document_frequency
+			float term_frequency = atof(line_subs[read_doc_freq + 1]);
+			free(line_subs[read_doc_freq + 1]);
+
+			float *normal_term_freq = malloc(sizeof(float));
+			*normal_term_freq = term_frequency / doc_freq;
+
+			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", compareCharKey, NULL);
+		}
 	}
 
-	return doc;
+	return words;
 }
