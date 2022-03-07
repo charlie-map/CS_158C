@@ -41,5 +41,13 @@ int main() {
 
 	// free(feature_space);
 
+	deepdestroy__hashmap(doc_map);
+
+	for (int free_word = 0; free_word < *word_bag_len; free_word++)
+		free(word_bag[free_word]);
+
+	free(word_bag_len);
+	free(word_bag);
+
 	return 0;
 }

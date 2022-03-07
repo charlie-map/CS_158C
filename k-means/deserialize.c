@@ -26,6 +26,16 @@ hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 	return hm;
 }
 
+void destroy_hashmap_body(hashmap_body_t *body_hash) {
+	free(body_hash->id);
+	free(body_hash->title);
+
+	deepdestroy__hashmap(body_hash->map);
+
+	free(body_hash);
+	return;
+}
+
 void hm_destroy_hashmap_body(void *hm_body) {
 	return destroy_hashmap_body((hashmap_body_t *) hm_body);
 }
@@ -44,11 +54,11 @@ hashmap *deserialize_title(char *title_reader) {
 	size_t line_buffer_size = sizeof(char) * 8;
 	char *line_buffer = malloc(line_buffer_size);
 
-	int *row_num = malloc(sizeof(int)), **split_row_word_len = malloc(sizeof(int *));
+	int *row_num = malloc(sizeof(int));
 
 	int line_buffer_length = 0;
 	while ((line_buffer_length = getline(&line_buffer, &line_buffer_size, index)) != -1) {
-		char **split_row = split_string(line_buffer, 0, row_num, "-d-r-l", delimeter_check, ": ", num_is_range, &split_row_word_len);
+		char **split_row = split_string(line_buffer, 0, row_num, "-d-r", delimeter_check, ": ", num_is_range);
 
 		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]) + 2);
 		// now pull out the different components into a hashmap value:
@@ -60,25 +70,26 @@ hashmap *deserialize_title(char *title_reader) {
 		char *doc_title = malloc(sizeof(char) * title_length);
 		strcpy(doc_title, split_row[1]);
 
+		free(split_row[1]);
+
 		for (int cp_doc_title = 2; cp_doc_title < *row_num - 1; cp_doc_title++) {
-			strcat(doc_title, split_row[cp_doc_title]);
 			strcat(doc_title, " ");
+			strcat(doc_title, split_row[cp_doc_title]);
+
+			free(split_row[cp_doc_title]);
 		}
+
+		free(split_row);
 
 		insert__hashmap(documents, doc_ID, create_hashmap_body(doc_ID, doc_title, mag), "", compareCharKey, NULL);
 	}
 
+	free(row_num);
+	free(line_buffer);
+
+	fclose(index);
+
 	return documents;
-}
-
-void destroy_hashmap_body(hashmap_body_t *body_hash) {
-	free(body_hash->id);
-	free(body_hash->title);
-
-	deepdestroy__hashmap(body_hash->map);
-
-	free(body_hash);
-	return;
 }
 
 int destroy_split_string(char **split_string, int *split_string_len) {
@@ -93,7 +104,7 @@ int destroy_split_string(char **split_string, int *split_string_len) {
 
 char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 	int words_index = 0; *max_words = 132;
-	char **words = malloc(sizeof(char) * *max_words);
+	char **words = malloc(sizeof(char *) * *max_words);
 
 	FILE *index = fopen(index_reader, "r");
 
@@ -110,7 +121,7 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 		// splice bag by multi_delimeters:
 		// use " " and ":" and "|" as delimeters
 		int *line_sub_max = malloc(sizeof(int));
-		char **line_subs = split_string(line_buffer, 0, line_sub_max, "-d-r", delimeter_check, " :,", num_is_range);
+		char **line_subs = split_string(line_buffer, 0, line_sub_max, "-d-r", delimeter_check, " :,|", num_is_range);
 
 		words[words_index] = line_subs[0];
 
@@ -119,11 +130,9 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 		float doc_freq = atof(line_subs[1]);
 		free(line_subs[1]);
 
-		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq++) {
-			char *doc_ID = line_subs[read_doc_freq];
-
-			printf("\nread %s %s\n", doc_ID, line_subs[read_doc_freq + 1]);
-			hashmap_body_t *doc = get__hashmap(docs, doc_ID, 0);
+		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
+			hashmap_body_t *doc = get__hashmap(docs, line_subs[read_doc_freq], 0);
+			free(line_subs[read_doc_freq]);
 
 			// calculate term_frequency / document_frequency
 			float term_frequency = atof(line_subs[read_doc_freq + 1]);
@@ -134,7 +143,18 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 
 			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", compareCharKey, NULL);
 		}
+
+		words_index++;
+		words = resize_array(words, max_words, words_index, sizeof(char *));
+
+		free(line_sub_max);
+		free(line_subs);
 	}
+
+	free(line_buffer);
+	fclose(index);
+
+	*max_words = words_index;
 
 	return words;
 }
