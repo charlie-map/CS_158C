@@ -27,11 +27,6 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 		}
 
 		float doc_word_tfidf = pre_doc_word_tfidf ? *(float *) pre_doc_word_tfidf : 0.0;
-		void *test = get__hashmap(doc, key, 0);
-		if (!test) {
-			printf("UH OH %d %s\n", calc_dp, key);
-			continue;
-		}
 
 		float centroid_word_tfidf = *(float *) get__hashmap(doc, key, 0);
 
@@ -139,6 +134,9 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		// calculate new averages ([k]means) for each centroid
 		centroid_mean_calculate(cluster, mean_shifts, k, doc);
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
+
+	free(doc_ID_len);
+	free(doc_ID);
 
 	free(mean_shifts);
 	free(prev_mean_shifts);

@@ -7,7 +7,7 @@
 #include "deserialize.h"
 #include "../utils/hashmap.h"
 
-#define K 16
+#define K 32
 #define CLUSTER_THRESHOLD 2
 
 int main() {
@@ -30,14 +30,7 @@ int main() {
 		}
 	}
 
-	// destroy_cluster(cluster, K);
-
-	// for (int f_feature_space = 0; f_feature_space < *array_length; f_feature_space++) {
-	// 	free(all_IDs[f_feature_space]);
-	// 	destroy_hashmap_body(feature_space[f_feature_space]);
-	// }
-
-	// free(feature_space);
+	destroy_cluster(cluster, K);
 
 	deepdestroy__hashmap(doc_map);
 
