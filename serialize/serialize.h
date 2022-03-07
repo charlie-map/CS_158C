@@ -5,9 +5,6 @@
 #include "token.h"
 #include "../utils/hashmap.h"
 
-typedef struct IDF_Track idf_t;
-void hashmap_destroy_idf(void *p);
-
 // struct for mutex locking
 typedef struct MutexLocker {
 	pthread_mutex_t mutex;
@@ -25,6 +22,9 @@ typedef struct TermFreqRep {
 	int doc_freq;
 } tf_t;
 void destroy_tf_t(void *tf);
+
+int delimeter_check(char curr_char, char *delims);
+
 int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, char **ID);
 
 void destroy_hashmap_val(void *ptr);
