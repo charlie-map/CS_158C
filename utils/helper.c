@@ -14,6 +14,16 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 	return arr;
 }
 
+// create index structure
+int delimeter_check(char curr_char, char *delims) {
+	for (int check_delim = 0; delims[check_delim]; check_delim++) {
+		if (delims[check_delim] == curr_char)
+			return 1;
+	}
+
+	return 0;
+}
+
 /*
 	goes through a char * to create an array of char * that are split
 	based on the delimeter character. If the string was:
@@ -56,7 +66,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	va_list param;
 	va_start(param, extra);
 
-	int **minor_length = NULL;
+	int ***minor_length = NULL;
 	int (*is_delim)(char, char *) = NULL;
 	char *multi_delims = NULL;
 
@@ -67,7 +77,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 			continue;
 
 		if (extra[check_extra + 1] == 'l')
-			minor_length = va_arg(param, int **);
+			minor_length = va_arg(param, int ***);
 		else if (extra[check_extra + 1] == 'd') {
 			is_delim = va_arg(param, int (*)(char, char *));
 			multi_delims = va_arg(param, char *);
@@ -80,6 +90,9 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	*arr_len = 8;
 	char **arr = malloc(sizeof(char *) * *arr_len);
 
+	if (minor_length)
+		*minor_length = realloc(*minor_length, sizeof(int *) * *arr_len);
+
 	int *max_curr_sub_word = malloc(sizeof(int)), curr_sub_word_index = 0;
 	*max_curr_sub_word = 8;
 	arr[arr_index] = malloc(sizeof(char) * *max_curr_sub_word);
@@ -91,8 +104,11 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 				continue;
 
 			// quickly copy curr_sub_word_index into minor_length if minor_length is defined:
-			if (minor_length)
-				(*minor_length)[arr_index] = curr_sub_word_index;
+			if (minor_length) {
+				(*minor_length)[arr_index] = malloc(sizeof(int));
+
+				*((*minor_length)[arr_index]) = curr_sub_word_index;
+			}
 
 			arr_index++;
 
@@ -101,7 +117,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 				arr = realloc(arr, sizeof(char *) * *arr_len);
 
 				if (minor_length)
-					*minor_length = realloc(*minor_length, sizeof(int) * *arr_len);
+					*minor_length = realloc(*minor_length, sizeof(int *) * *arr_len);
 			}
 
 			curr_sub_word_index = 0;

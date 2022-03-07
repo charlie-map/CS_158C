@@ -22,13 +22,13 @@ int main() {
 	char **word_bag = deserialize("../serialize/predocbags.txt", doc_map, word_bag_len);
 
 	// start k-means to calculate clusters
-	cluster_t **cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	// cluster_t **cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
 
 	// for (int check_cluster = 0; check_cluster < K; check_cluster++) {
 	// 	printf("-----Check docs on %d-----\n", check_cluster + 1);
 
 	// 	for (int read_cluster_doc = 0; read_cluster_doc < cluster[check_cluster]->doc_pos_index; read_cluster_doc++) {
-	// 		printf("ID: %s\n", feature_space[cluster[check_cluster]->doc_pos[read_cluster_doc]]->id);
+	// 		printf("ID: %s\n", cluster[check_cluster]->doc_pos[read_cluster_doc]);
 	// 	}
 	// }
 

@@ -48,20 +48,21 @@ hashmap *deserialize_title(char *title_reader) {
 
 	int line_buffer_length = 0;
 	while ((line_buffer_length = getline(&line_buffer, &line_buffer_size, index)) != -1) {
-		char **split_row = split_string(line_buffer, ':', row_num, "-r-l", num_is_range, split_row_word_len);
+		char **split_row = split_string(line_buffer, 0, row_num, "-d-r-l", delimeter_check, ": ", num_is_range, &split_row_word_len);
 
-		int id_mag_length = strlen(split_row[0]) + strlen(split_row[*row_num - 1]);
+		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]) + 2);
 		// now pull out the different components into a hashmap value:
 		char *doc_ID = split_row[0];
 
 		float mag = atof(split_row[*row_num - 1]);
 		free(split_row[*row_num - 1]);
 
-		char *doc_title = malloc(sizeof(char) * id_mag_length);
+		char *doc_title = malloc(sizeof(char) * title_length);
 		strcpy(doc_title, split_row[1]);
 
 		for (int cp_doc_title = 2; cp_doc_title < *row_num - 1; cp_doc_title++) {
 			strcat(doc_title, split_row[cp_doc_title]);
+			strcat(doc_title, " ");
 		}
 
 		insert__hashmap(documents, doc_ID, create_hashmap_body(doc_ID, doc_title, mag), "", compareCharKey, NULL);
@@ -121,6 +122,7 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq++) {
 			char *doc_ID = line_subs[read_doc_freq];
 
+			printf("\nread %s %s\n", doc_ID, line_subs[read_doc_freq + 1]);
 			hashmap_body_t *doc = get__hashmap(docs, doc_ID, 0);
 
 			// calculate term_frequency / document_frequency
