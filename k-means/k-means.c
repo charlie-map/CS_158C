@@ -82,7 +82,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		copy__hashmap(new_centroid, copyer_hashmap->map);
 
 		cluster[create_centroid] = malloc(sizeof(cluster_t));
-		cluster[create_centroid]->doc_pos = malloc(sizeof(int) * 8);
+		cluster[create_centroid]->doc_pos = malloc(sizeof(char *) * 8);
 		cluster[create_centroid]->max_doc_pos = 8;
 		cluster[create_centroid]->doc_pos_index = 0;
 		
@@ -123,14 +123,16 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 				}
 			}
 
+			cluster_t *curr_max_centroid = cluster[max_centroid];
+
 			// do something with this information...
-			cluster[max_centroid]->doc_pos[cluster[max_centroid]->doc_pos_index++] = doc_ID[find_doc_centroid];
+			curr_max_centroid->doc_pos[curr_max_centroid->doc_pos_index++] = doc_ID[find_doc_centroid];
 
 			// resize check
-			if (cluster[max_centroid]->doc_pos_index == cluster[max_centroid]->max_doc_pos) {
-				cluster[max_centroid]->max_doc_pos *= 2;
+			if (curr_max_centroid->doc_pos_index == curr_max_centroid->max_doc_pos) {
+				curr_max_centroid->max_doc_pos *= 2;
 
-				cluster[max_centroid]->doc_pos = realloc(cluster[max_centroid]->doc_pos, sizeof(int) * cluster[max_centroid]->max_doc_pos);
+				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * cluster[max_centroid]->max_doc_pos);
 			}
 		}
 
