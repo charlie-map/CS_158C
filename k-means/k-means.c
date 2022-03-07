@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,11 +27,6 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 		}
 
 		float doc_word_tfidf = pre_doc_word_tfidf ? *(float *) pre_doc_word_tfidf : 0.0;
-		void *test = get__hashmap(doc, key, 0);
-		if (!test) {
-			printf("UH OH %d %s\n", calc_dp, key);
-			continue;
-		}
 
 		float centroid_word_tfidf = *(float *) get__hashmap(doc, key, 0);
 
@@ -48,7 +44,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 int copy__hashmap(hashmap *m1, hashmap *m2);
 
-float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap_body_t **doc);
+float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap *doc);
 int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold);
 
 int destroy_cluster(cluster_t **cluster, int k) {
@@ -64,22 +60,28 @@ int destroy_cluster(cluster_t **cluster, int k) {
 	return 0;
 }
 
-cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int cluster_threshold) {
-	// will choose the first k documents as centroids :D
+cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
+	srand(time(NULL));
+	// choosing random k documents
 
+	int *doc_ID_len = malloc(sizeof(int));
+	char **doc_ID = (char **) keys__hashmap(doc, doc_ID_len, "");
 	// create centroids based off of first k documents
 	cluster_t **cluster = malloc(sizeof(cluster_t *) * k);
 	for (int create_centroid = 0; create_centroid < k; create_centroid++) {
 		hashmap *new_centroid = make__hashmap(0, NULL, destroy_hashmap_float);
 
-		copy__hashmap(new_centroid, doc[create_centroid]->map);
+		int rand_copy_map_val = rand() % *doc_ID_len;
+
+		hashmap_body_t *copyer_hashmap = get__hashmap(doc, doc_ID[rand_copy_map_val], 0);
+		copy__hashmap(new_centroid, copyer_hashmap->map);
 
 		cluster[create_centroid] = malloc(sizeof(cluster_t));
-		cluster[create_centroid]->doc_pos = malloc(sizeof(int) * 8);
+		cluster[create_centroid]->doc_pos = malloc(sizeof(char *) * 8);
 		cluster[create_centroid]->max_doc_pos = 8;
 		cluster[create_centroid]->doc_pos_index = 0;
 		
-		cluster[create_centroid]->sqrt_mag = doc[create_centroid]->sqrt_mag;
+		cluster[create_centroid]->sqrt_mag = copyer_hashmap->sqrt_mag;
 
 		cluster[create_centroid]->centroid = new_centroid;
 	}
@@ -99,14 +101,15 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 		}
 
 		// go through non-centroid documents and assign them to centroids
-		for (int find_doc_centroid = 0; find_doc_centroid < doc_len; find_doc_centroid++) {
+		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
+			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], 0));
 			// find most similar centroid using cosine similarity (largest value returned is most similar):
 			int max_centroid = 0;
-			float max = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
+			float max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
 			for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
 				
-				float check_max = cosine_similarity(doc[find_doc_centroid]->map, doc[find_doc_centroid]->sqrt_mag,
+				float check_max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag,
 					cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
 
 				if (check_max > max) {
@@ -115,20 +118,25 @@ cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int 
 				}
 			}
 
+			cluster_t *curr_max_centroid = cluster[max_centroid];
+
 			// do something with this information...
-			cluster[max_centroid]->doc_pos[cluster[max_centroid]->doc_pos_index++] = find_doc_centroid;
+			curr_max_centroid->doc_pos[curr_max_centroid->doc_pos_index++] = doc_ID[find_doc_centroid];
 
 			// resize check
-			if (cluster[max_centroid]->doc_pos_index == cluster[max_centroid]->max_doc_pos) {
-				cluster[max_centroid]->max_doc_pos *= 2;
+			if (curr_max_centroid->doc_pos_index == curr_max_centroid->max_doc_pos) {
+				curr_max_centroid->max_doc_pos *= 2;
 
-				cluster[max_centroid]->doc_pos = realloc(cluster[max_centroid]->doc_pos, sizeof(int) * cluster[max_centroid]->max_doc_pos);
+				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * cluster[max_centroid]->max_doc_pos);
 			}
 		}
 
 		// calculate new averages ([k]means) for each centroid
 		centroid_mean_calculate(cluster, mean_shifts, k, doc);
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
+
+	free(doc_ID_len);
+	free(doc_ID);
 
 	free(mean_shifts);
 	free(prev_mean_shifts);
@@ -146,7 +154,7 @@ int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshol
 	return 0;
 }
 
-float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap_body_t **doc) {
+float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap *doc) {
 	// for each centroid
 	for (int find_mean_centroid = 0; find_mean_centroid < k; find_mean_centroid++) {
 		mean_shift[find_mean_centroid] = 0;
@@ -163,12 +171,13 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 			*centroid_tfidf = 0;
 
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
-				void *doc_tfidf = get__hashmap(doc[centroids[find_mean_centroid]->doc_pos[check_doc]]->map, cluster_word[word_mean], 0);
+				float *doc_tfidf = (float *) get__hashmap(((hashmap_body_t *) get__hashmap(doc,
+					centroids[find_mean_centroid]->doc_pos[check_doc], 0))->map, cluster_word[word_mean], 0);
 
 				if (!doc_tfidf)
 					continue;
 
-				*centroid_tfidf += *(float *) doc_tfidf;
+				*centroid_tfidf += *doc_tfidf;
 			}
 
 			*centroid_tfidf /= cluster_size;

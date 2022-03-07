@@ -98,7 +98,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
 
 	// create an int array so we can know the length of each char *
-	int *phrase_len = malloc(sizeof(int) * 8);
+	int *phrase_len = malloc(sizeof(int));
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max, "-l", &phrase_len);
 
 	deepdestroy__hashmap(block_tag_check);

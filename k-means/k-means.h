@@ -3,10 +3,11 @@
 
 #include "../serialize/serialize.h"
 #include "../utils/hashmap.h"
+#include "deserialize.h"
 
 typedef struct Cluster {
 	int max_doc_pos, doc_pos_index;
-	int *doc_pos;
+	char **doc_pos;
 
 	float sqrt_mag;
 
@@ -15,6 +16,6 @@ typedef struct Cluster {
 
 int destroy_cluster(cluster_t **cluster, int k);
 
-cluster_t **k_means(hashmap_body_t **doc, int doc_len, hashmap *idf, int k, int cluster_threshold);
+cluster_t **k_means(hashmap *doc, int k, int cluster_threshold);
 
 #endif

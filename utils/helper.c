@@ -90,6 +90,9 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	*arr_len = 8;
 	char **arr = malloc(sizeof(char *) * *arr_len);
 
+	if (minor_length)
+		*minor_length = realloc(*minor_length, sizeof(int) * *arr_len);
+
 	int *max_curr_sub_word = malloc(sizeof(int)), curr_sub_word_index = 0;
 	*max_curr_sub_word = 8;
 	arr[arr_index] = malloc(sizeof(char) * *max_curr_sub_word);
@@ -101,8 +104,9 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 				continue;
 
 			// quickly copy curr_sub_word_index into minor_length if minor_length is defined:
-			if (minor_length)
+			if (minor_length) {
 				(*minor_length)[arr_index] = curr_sub_word_index;
+			}
 
 			arr_index++;
 
@@ -111,7 +115,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 				arr = realloc(arr, sizeof(char *) * *arr_len);
 
 				if (minor_length)
-					*minor_length = realloc(*minor_length, sizeof(int) * *arr_len);
+					*minor_length = realloc(*minor_length, sizeof(int *) * *arr_len);
 			}
 
 			curr_sub_word_index = 0;

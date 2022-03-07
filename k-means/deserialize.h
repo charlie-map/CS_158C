@@ -1,7 +1,7 @@
 #ifndef __DESERIALIZE_L__
 #define __DESERIALIZE_L__
 
-#include "../utils/hashmap.c"
+#include "../utils/hashmap.h"
 
 typedef struct HashmapBody {
 	char *id, *title;
@@ -14,6 +14,6 @@ void destroy_hashmap_body(hashmap_body_t *body_hash);
 
 hashmap *deserialize_title(char *title_reader);
 
-hashmap_body_t **deserialize_bag(char *index_reader, int dtf_drop_threshold);
+char **deserialize(char *index_reader, hashmap *docs, int *max_words);
 
 #endif /* __DESERIALIZE_L__ */
