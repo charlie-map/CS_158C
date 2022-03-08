@@ -17,5 +17,6 @@ typedef struct Cluster {
 int destroy_cluster(cluster_t **cluster, int k);
 
 cluster_t **k_means(hashmap *doc, int k, int cluster_threshold);
+cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc);
 
 #endif

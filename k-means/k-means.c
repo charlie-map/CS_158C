@@ -104,21 +104,8 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
 			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], 0));
-			// find most similar centroid using cosine similarity (largest value returned is most similar):
-			int max_centroid = 0;
-			float max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
-			for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
-				
-				float check_max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag,
-					cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
-
-				if (check_max > max) {
-					max = check_max;
-					max_centroid = curr_centroid;
-				}
-			}
-
-			cluster_t *curr_max_centroid = cluster[max_centroid];
+			
+			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
 			// do something with this information...
 			curr_max_centroid->doc_pos[curr_max_centroid->doc_pos_index++] = doc_ID[find_doc_centroid];
@@ -127,7 +114,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 			if (curr_max_centroid->doc_pos_index == curr_max_centroid->max_doc_pos) {
 				curr_max_centroid->max_doc_pos *= 2;
 
-				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * cluster[max_centroid]->max_doc_pos);
+				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * curr_max_centroid->max_doc_pos);
 			}
 		}
 
@@ -216,4 +203,22 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 	free(m2_words);
 
 	return 0;
+}
+
+cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc) {
+	// find most similar centroid using cosine similarity (largest value returned is most similar):
+	int max_centroid = 0;
+	float max = cosine_similarity(doc->map, doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
+	for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
+		
+		float check_max = cosine_similarity(doc->map, doc->sqrt_mag,
+			cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
+
+		if (check_max > max) {
+			max = check_max;
+			max_centroid = curr_centroid;
+		}
+	}
+
+	return cluster[max_centroid];
 }
