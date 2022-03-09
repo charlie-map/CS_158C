@@ -4,12 +4,17 @@
 #include <math.h>
 #include <time.h>
 
+#include "kd-tree.h"
 #include "../k-means/k-means.h"
 #include "../k-means/deserialize.h"
 #include "../utils/hashmap.h"
 
 #define K 32
 #define CLUSTER_THRESHOLD 2
+
+int weight(void *map1_val, void *map2_val);
+void *member_extract(void *map, void *dimension);
+void *next_dimension(void *curr_dimension);
 
 int main() {
 	// see k-means folder for more on these functions
@@ -42,6 +47,11 @@ int main() {
 		printf("Document %s: %s\n", closest_cluster->doc_pos[read_cluster_doc], title);
 	}
 
+	// now with closest cluster, the next step is calculating which document is the closest
+	// be wary of the document itself
+	// start by creating a k-d tree with the documents in the closest cluster as the inputs
+	
+
 	destroy_cluster(cluster, K);
 
 	deepdestroy__hashmap(doc_map);
@@ -53,4 +63,18 @@ int main() {
 	free(word_bag);
 
 	return 0;
+}
+
+int weight(void *map1_val, void *map2_val) {
+	return *(float *) map1_val < *(float *) map2_val;
+}
+
+void *member_extract(void *map, void *dimension) {
+	return get__hashmap(map, (char *) dimension, 0);
+}
+
+void *next_dimension(void *curr_dimension) {
+	// curr dimension is a char * that searches into a hashmap for the next value
+	// this hashmap has each char * pointing to the next, which allows for the
+	// dimensions to be based on an initial weighting from the cluster centroid
 }
