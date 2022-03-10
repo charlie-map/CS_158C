@@ -14,6 +14,11 @@ typedef struct Cluster {
 	hashmap *centroid;
 } cluster_t;
 
+typedef struct HashmapData {
+	float tf_idf;
+	float standard_deviation;
+} cluster_centroid_data;
+
 int destroy_cluster(cluster_t **cluster, int k);
 
 cluster_t **k_means(hashmap *doc, int k, int cluster_threshold);

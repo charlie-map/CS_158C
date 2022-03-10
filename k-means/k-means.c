@@ -5,6 +5,21 @@
 
 #include "k-means.h"
 
+cluster_centroid_data *create_cluster_centroid_data(float data) {
+	cluster_centroid_data *new_ccd = malloc(sizeof(cluster_centroid_data));
+
+	new_ccd->tf_idf = data;
+	new_ccd->standard_deviation = 0;
+
+	return new_ccd;
+}
+
+void destroy_cluster_centroid_data(cluster_centroid_data *ccd) {
+	free(ccd);
+
+	return;
+}
+
 // calculate the distance by going through the centroids word map
 // if the doc doesn't have the word (or vice-versa) then the dot-product
 // will be 0
@@ -69,7 +84,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 	// create centroids based off of first k documents
 	cluster_t **cluster = malloc(sizeof(cluster_t *) * k);
 	for (int create_centroid = 0; create_centroid < k; create_centroid++) {
-		hashmap *new_centroid = make__hashmap(0, NULL, destroy_hashmap_float);
+		hashmap *new_centroid = make__hashmap(0, NULL, destroy_cluster_centroid_data);
 
 		int rand_copy_map_val = rand() % *doc_ID_len;
 
@@ -153,10 +168,12 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 
 		// for each word in cluster, add up tf-idf from each document in cluster and devide by number of documents
 		for (int word_mean = 0; word_mean < *cluster_word_len; word_mean++) {
-			float *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
-			float prev_centroid_tfidf = *centroid_tfidf;			
-			*centroid_tfidf = 0;
+			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
+			float mean_tfidf = centroid_tfidf->tf_idf;			
+			centroid_tfidf->tf_idf = 0;
 
+			float numerator = 0;
+			float standard_deviation = 0;
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
 				float *doc_tfidf = (float *) get__hashmap(((hashmap_body_t *) get__hashmap(doc,
 					centroids[find_mean_centroid]->doc_pos[check_doc], 0))->map, cluster_word[word_mean], 0);
@@ -164,8 +181,13 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 				if (!doc_tfidf)
 					continue;
 
+				float numerator_addon = *doc_tfidf - mean_tfidf;
+				numerator += numerator_addon * numerator_addon;
 				*centroid_tfidf += *doc_tfidf;
 			}
+
+			// calculate rest of standard deviation
+			centroid_tfidf->standard_deviation = sqrt(numerator_addon / (cluster_size - 1));
 
 			*centroid_tfidf /= cluster_size;
 			float tfidf_diff = (*centroid_tfidf) - prev_centroid_tfidf;
@@ -186,17 +208,11 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 
-		float *m1_new_value = malloc(sizeof(float));
-		void *test = get__hashmap(m2, m2_words[cp_value], 0);
+		float m1_value = *(float *) get__hashmap(m2, m2_words[cp_value], 0);
 
-		if (!test) {
-			printf("UH OH %s\n", m2_words[cp_value]);
-			continue;
-		}
+		cluster_centroid_data *new_ccd = create_cluster_centroid_data(m1_value);
 
-		*m1_new_value = *(float *) test;
-
-		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", compareCharKey, NULL);
+		insert__hashmap(m1, m2_words[cp_value], new_ccd, "", compareCharKey, NULL);
 	}
 
 	free(m2_value_len);
