@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "k-means.h"
 
@@ -14,8 +15,8 @@ cluster_centroid_data *create_cluster_centroid_data(float data) {
 	return new_ccd;
 }
 
-void destroy_cluster_centroid_data(cluster_centroid_data *ccd) {
-	free(ccd);
+void destroy_cluster_centroid_data(void *ccd) {
+	free((cluster_centroid_data *) ccd);
 
 	return;
 }
@@ -36,8 +37,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 		void *pre_doc_word_tfidf = get__hashmap(centroid, key, 0);
 		if (!pre_doc_word_tfidf) { // insert into centroid with new data
-			float *new_centroid_data = malloc(sizeof(float));
-			*new_centroid_data = 0.0;
+			cluster_centroid_data *new_centroid_data = create_cluster_centroid_data(0.0);
 			insert__hashmap(centroid, key, new_centroid_data, "", compareCharKey, NULL);
 		}
 
@@ -183,14 +183,14 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 
 				float numerator_addon = *doc_tfidf - mean_tfidf;
 				numerator += numerator_addon * numerator_addon;
-				*centroid_tfidf += *doc_tfidf;
+				centroid_tfidf->tf_idf += *doc_tfidf;
 			}
 
 			// calculate rest of standard deviation
-			centroid_tfidf->standard_deviation = sqrt(numerator_addon / (cluster_size - 1));
+			centroid_tfidf->standard_deviation = sqrt(numerator / (cluster_size - 1));
 
-			*centroid_tfidf /= cluster_size;
-			float tfidf_diff = (*centroid_tfidf) - prev_centroid_tfidf;
+			centroid_tfidf->tf_idf /= cluster_size;
+			float tfidf_diff = centroid_tfidf->tf_idf - mean_tfidf;
 			mean_shift[find_mean_centroid] += tfidf_diff * tfidf_diff;
 		}
 

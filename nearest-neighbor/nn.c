@@ -17,7 +17,7 @@ void *member_extract(void *map, void *dimension);
 void *next_dimension(void *curr_dimension);
 
 hashmap *dimensions;
-int build_dimensions(cluster_t *curr_cluster, hashmap *doc_map);
+char *build_dimensions(cluster_t *curr_cluster);
 
 int main() {
 	// see k-means folder for more on these functions
@@ -55,7 +55,7 @@ int main() {
 	// start by creating a k-d tree with the documents in the closest cluster as the inputs
 	
 	// setup hashmap of important characters
-	build_dimensions(closest_cluster, doc_map);
+	char *d_1 = build_dimensions(closest_cluster);
 
 	// build array of documents within the closest cluster:
 	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
@@ -63,13 +63,13 @@ int main() {
 		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], 0);
 	}
 
-	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, closest_cluster->doc_pos[0], next_dimension);
+	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension);
 
 	// load k-d tree
-	kdtree_load(cluster_rep, cluster_docs, closest_cluster->doc_pos_index);
+	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
+	kdtree_destroy(cluster_rep);
 	destroy_cluster(cluster, K);
-
 	deepdestroy__hashmap(doc_map);
 
 	for (int free_word = 0; free_word < *word_bag_len; free_word++)
@@ -81,16 +81,16 @@ int main() {
 	return 0;
 }
 
-hashmap *build_dimensions(cluster_t *curr_cluster) {
+char *build_dimensions(cluster_t *curr_cluster) {
 	float cluster_size = log(curr_cluster->doc_pos_index);
 
 	int *key_length = malloc(sizeof(int));
-	char **keys = keys__hashmap(curr_cluster->centroid, key_length, "");
+	char **keys = (char **) keys__hashmap(curr_cluster->centroid, key_length, "");
 
 	for (int read_best = 0; read_best < cluster_size; read_best++) {
 
 		int best_stddev_pos = read_best;
-		float best_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_key_pos], 0))->standard_deviation;
+		float best_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], 0))->standard_deviation;
 		for (int find_best_key = read_best + 1; find_best_key < *key_length; find_best_key++) {
 
 			float test_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->standard_deviation;
@@ -118,22 +118,27 @@ hashmap *build_dimensions(cluster_t *curr_cluster) {
 
 	insert__hashmap(dimensions, keys[*key_length - 1], keys[0], "", compareCharKey, NULL);
 
-	return 0;
+	return keys[0];
 }
 
 int weight(void *map1_val, void *map2_val) {
-	return *(float *) map1_val < *(float *) map2_val;
+	if ((!map1_val && !map2_val) || (!map1_val && map2_val))
+		return 1;
+	else if (map1_val && !map2_val)
+		return 0;
+	else
+		return *(float *) map1_val < *(float *) map2_val;
 }
 
 void *member_extract(void *map_body, void *dimension) {
-	return get__hashmap(((hashmap *) map_body)->map, (char *) dimension, 0);
+	return get__hashmap(((hashmap_body_t *) map_body)->map, (char *) dimension, 0);
 }
 
 void *next_dimension(void *curr_dimension) {
 	// curr dimension is a char * that searches into a hashmap for the next value
 	// this hashmap has each char * pointing to the next, which allows for the
 	// dimensions to be based on an initial weighting from the cluster centroid
-	return get__hashmap(dimensions, (char *) curr_dimensions, 0);
+	return get__hashmap(dimensions, (char *) curr_dimension, 0);
 }
 
 /* search:
