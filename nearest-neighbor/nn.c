@@ -13,6 +13,8 @@
 #define CLUSTER_THRESHOLD 2
 
 int weight(void *map1_val, void *map2_val);
+float distance(void *map1_val, void *map2_val);
+float meta_distance(void *map1_body, void *map2_body);
 void *member_extract(void *map, void *dimension);
 void *next_dimension(void *curr_dimension);
 
@@ -57,16 +59,27 @@ int main() {
 	// setup hashmap of important characters
 	char *d_1 = build_dimensions(closest_cluster);
 
+	printf("\nbest dimensions: \n");
+	char *d_checker = d_1;
+	for (int read_dimensions = 0; read_dimensions < 10; read_dimensions++) {
+		printf("Dim %d: %s\n", read_dimensions, d_checker);
+
+		d_checker = (char *) get__hashmap(dimensions, d_checker, 0);
+	}
+
 	// build array of documents within the closest cluster:
 	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
 	for (int pull_cluster_doc = 0; pull_cluster_doc < closest_cluster->doc_pos_index; pull_cluster_doc++) {
 		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], 0);
 	}
 
-	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension);
+	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension, distance, meta_distance);
 
 	// load k-d tree
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
+
+	// search for most relavant document:
+	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, rand_doc);
 
 	kdtree_destroy(cluster_rep);
 	destroy_cluster(cluster, K);
@@ -82,7 +95,8 @@ int main() {
 }
 
 char *build_dimensions(cluster_t *curr_cluster) {
-	float cluster_size = log(curr_cluster->doc_pos_index);
+	float cluster_size = log(curr_cluster->doc_pos_index) + 4;
+	printf("dimension picks %1.3f\n", cluster_size);
 
 	int *key_length = malloc(sizeof(int));
 	char **keys = (char **) keys__hashmap(curr_cluster->centroid, key_length, "");
@@ -91,13 +105,16 @@ char *build_dimensions(cluster_t *curr_cluster) {
 
 		int best_stddev_pos = read_best;
 		float best_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], 0))->standard_deviation;
+		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], 0))->doc_freq;
 		for (int find_best_key = read_best + 1; find_best_key < *key_length; find_best_key++) {
 
 			float test_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->standard_deviation;
+			int test_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->doc_freq;
 
 			// if test_stddev is greater than best_stddev, update best_stddev_pos and best_stddev
-			if (test_stddev > best_stddev) {
+			if (test_stddev * 0.6 + test_doc_freq > best_stddev * 0.6 + best_doc_freq) {
 				best_stddev = test_stddev;
+				best_doc_freq = test_doc_freq;
 
 				best_stddev_pos = find_best_key;
 			}
@@ -130,6 +147,21 @@ int weight(void *map1_val, void *map2_val) {
 		return *(float *) map1_val < *(float *) map2_val;
 }
 
+float distance(void *map1_val, void *map2_val) {
+	float val1 = map1_val ? *(float *) map1_val : 0;
+	float val2 = map2_val ? *(float *) map2_val : 0;
+
+	float d = val1 - val2;
+
+	return d * d;
+}
+
+float meta_distance(void *map1_body, void *map2_body) {
+	float d = ((hashmap_body_t *) map1_body)->mag - ((hashmap_body_t *) map2_body)->mag;
+
+	return d * d;
+}
+
 void *member_extract(void *map_body, void *dimension) {
 	return get__hashmap(((hashmap_body_t *) map_body)->map, (char *) dimension, 0);
 }
@@ -140,12 +172,3 @@ void *next_dimension(void *curr_dimension) {
 	// dimensions to be based on an initial weighting from the cluster centroid
 	return get__hashmap(dimensions, (char *) curr_dimension, 0);
 }
-
-/* search:
-is the square dist between current best's dimension X and this split's dimension X greater
-	or less than the overall dist between current and search term?
-----If it's greater
-	bail and do not recur
-----If it's less
-	you can determine nothing, so recur
-*/

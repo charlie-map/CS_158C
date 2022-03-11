@@ -11,6 +11,7 @@ cluster_centroid_data *create_cluster_centroid_data(float data) {
 
 	new_ccd->tf_idf = data;
 	new_ccd->standard_deviation = 0;
+	new_ccd->doc_freq = 0;
 
 	return new_ccd;
 }
@@ -171,6 +172,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
 			float mean_tfidf = centroid_tfidf->tf_idf;			
 			centroid_tfidf->tf_idf = 0;
+			centroid_tfidf->doc_freq = 0;
 
 			float numerator = 0;
 			float standard_deviation = 0;
@@ -180,6 +182,8 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 
 				if (!doc_tfidf)
 					continue;
+
+				centroid_tfidf->doc_freq++;
 
 				float numerator_addon = *doc_tfidf - mean_tfidf;
 				numerator += numerator_addon * numerator_addon;
