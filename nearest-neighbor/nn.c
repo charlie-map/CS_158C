@@ -62,7 +62,9 @@ int main() {
 	printf("\nbest dimensions: \n");
 	char *d_checker = d_1;
 	for (int read_dimensions = 0; read_dimensions < 10; read_dimensions++) {
-		printf("Dim %d: %s\n", read_dimensions, d_checker);
+		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(closest_cluster->centroid, d_checker, 0))->doc_freq;
+
+		printf("Dim %d: %s -- doc freq: %d\n", read_dimensions, d_checker, best_doc_freq);
 
 		d_checker = (char *) get__hashmap(dimensions, d_checker, 0);
 	}
@@ -81,6 +83,8 @@ int main() {
 	// search for most relavant document:
 	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, rand_doc);
 
+	printf("closest doc: %s\n", return_doc->title);
+
 	kdtree_destroy(cluster_rep);
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
@@ -95,7 +99,7 @@ int main() {
 }
 
 char *build_dimensions(cluster_t *curr_cluster) {
-	float cluster_size = log(curr_cluster->doc_pos_index) + 4;
+	float cluster_size = log(curr_cluster->doc_pos_index) + 1;
 	printf("dimension picks %1.3f\n", cluster_size);
 
 	int *key_length = malloc(sizeof(int));
@@ -112,7 +116,7 @@ char *build_dimensions(cluster_t *curr_cluster) {
 			int test_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->doc_freq;
 
 			// if test_stddev is greater than best_stddev, update best_stddev_pos and best_stddev
-			if (test_stddev * 0.6 + test_doc_freq > best_stddev * 0.6 + best_doc_freq) {
+			if (test_stddev * 0.6 + test_doc_freq > best_stddev * 0.6 + best_doc_freq && test_doc_freq < cluster_size) {
 				best_stddev = test_stddev;
 				best_doc_freq = test_doc_freq;
 
@@ -157,7 +161,10 @@ float distance(void *map1_val, void *map2_val) {
 }
 
 float meta_distance(void *map1_body, void *map2_body) {
-	float d = ((hashmap_body_t *) map1_body)->mag - ((hashmap_body_t *) map2_body)->mag;
+	float mag1 = map1_body ? ((hashmap_body_t *) map1_body)->mag : 0;
+	float mag2 = map2_body ? ((hashmap_body_t *) map2_body)->mag : 0;
+
+	float d = mag1 - mag2;
 
 	return d * d;
 }

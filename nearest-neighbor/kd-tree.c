@@ -227,6 +227,13 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 	return k_node->payload;
 }
 
+void tabs(int amount) {
+	for (int i = 0; i < amount; i++) {
+		printf("\t");
+	}
+
+	return;
+}
 /* search:
 is the square dist between current best's dimension X and this split's dimension X
 	greater or less than the overall dist between current and search term?
@@ -235,12 +242,11 @@ is the square dist between current best's dimension X and this split's dimension
 ----If it's less
 	you can determine nothing, so recur
 */
-void *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *kd_payload) {
+void *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *kd_payload, int depth) {
 	if (!k_node)
 		return NULL;
 
 	// look at current k_node and see which direction to go in:
-	printf("\nStart compare: %s %s\n", ((hashmap_body_t *) k_node->payload)->title, ((hashmap_body_t *) kd_payload)->title);
 	void *node_payload = k_t->member_extract(k_node->payload, dimension);
 	void *search_payload = k_t->member_extract(kd_payload, dimension);
 
@@ -248,32 +254,42 @@ void *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, vo
 
 	// depending on weight, choose which direction to move in
 	// if 1, move left, 0, move right
-	void *curr_best = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), kd_payload);
-	if (curr_best)
-		printf("Found next: %s\n", ((hashmap_body_t *) curr_best)->title);
-	else
-		printf("no curr best\n");
-	void *curr_best_payload;
+	void *curr_best = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), kd_payload, depth + 1);
+	curr_best = curr_best ? curr_best : search_kdtree_helper(k_t, weight ? k_node->right: k_node->left, k_t->next_d(dimension), kd_payload, depth + 1);
+	if (!curr_best)
+		return k_node->payload;
+
+	void *curr_best_payload = NULL;
 	if (curr_best)
 		curr_best_payload = k_t->member_extract(curr_best, dimension);
 
 	// based on return payload, make some comparisons to see what to do next:
 	// check the split payload againt the best payload in the current dimension
 
+	tabs(depth);
+	printf("Running docs node %s - curr %s - search %s\n",
+		((hashmap_body_t *) k_node->payload)->title, ((hashmap_body_t *) curr_best)->title,
+		((hashmap_body_t *) kd_payload)->title);
+
 	float curr_best_v_node_distance = k_t->distance(node_payload, curr_best_payload);
-	float curr_best_v_search_distance = k_t->distance(kd_payload, curr_best_payload);
+	float curr_best_v_search_distance = k_t->distance(search_payload, curr_best_payload);
+
+	tabs(depth);
+	printf("node curr dist: %1.3f\n", curr_best_v_node_distance);
+	tabs(depth);
+	printf("search curr dist: %1.3f\n", curr_best_v_search_distance);
 
 	if (node_payload == search_payload)
 		return curr_best;
 
-	if (curr_best_v_node_distance > curr_best_v_search_distance)
+	if (curr_best_v_node_distance > curr_best_v_search_distance && curr_best_payload != search_payload)
 		return curr_best;
 	else
 		return k_node->payload;
 }
 
 void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload) {
-	return search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload);
+	return search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, 0);
 }
 
 // DFS for node
