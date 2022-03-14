@@ -18,7 +18,8 @@
 
 #define THREAD_NUMBER 8
 
-#define DTF_THRESHOLD 2
+#define DTF_PERCENT_THRESHOLD 0.7
+#define DTF_LOW_THRESHOLD 2
 
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
@@ -187,7 +188,7 @@ int main() {
 		tf_t *dat = get__hashmap(term_freq, words[fp_word], 0);
 
 		// check that the term has a high enough document frequency
-		if (dat->doc_freq < DTF_THRESHOLD) {
+		if (dat->doc_freq < DTF_LOW_THRESHOLD || (dat->doc_freq / *array_length) > DTF_PERCENT_THRESHOLD) {
 			// remove the key and value from the hashmap
 			delete__hashmap(term_freq, words[fp_word]);
 
