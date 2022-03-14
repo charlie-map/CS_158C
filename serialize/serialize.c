@@ -66,6 +66,8 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	int *ID_len = malloc(sizeof(int));
 	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
+	printf("CHECK ID %d %s\n", *ID_len, *ID);
+
 	total_bag_size += *ID_len - 1;
 
 	// get title
@@ -168,7 +170,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		int length = *ID_len + freq_len;
 
 		// make sure char has enough space
-		while (m_val->full_rep_index + length + 1 > m_val->max_full_rep) {
+		while (m_val->full_rep_index + length + 1 >= m_val->max_full_rep) {
 			m_val->max_full_rep *= 2;
 
 			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);
