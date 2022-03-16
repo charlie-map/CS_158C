@@ -19,7 +19,7 @@ void *member_extract(void *map, void *dimension);
 void *next_dimension(void *curr_dimension);
 
 hashmap *dimensions;
-char *build_dimensions(cluster_t *curr_cluster);
+char **build_dimensions(cluster_t *curr_cluster);
 
 int main() {
 	// see k-means folder for more on these functions
@@ -69,7 +69,8 @@ int main() {
 	// start by creating a k-d tree with the documents in the closest cluster as the inputs
 	
 	// setup hashmap of important characters
-	char *d_1 = build_dimensions(closest_cluster);
+	char **dimension_charset = build_dimensions(closest_cluster);
+	char *d_1 = dimension_charset[0];
 
 	printf("\nbest dimensions: \n");
 	char *d_checker = d_1;
@@ -97,6 +98,10 @@ int main() {
 
 	printf("closest doc: %s\n", return_doc->title);
 
+	free(cluster_docs);
+	free(dimension_charset);
+	deepdestroy__hashmap(dimensions);
+
 	kdtree_destroy(cluster_rep);
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
@@ -110,7 +115,7 @@ int main() {
 	return 0;
 }
 
-char *build_dimensions(cluster_t *curr_cluster) {
+char **build_dimensions(cluster_t *curr_cluster) {
 	float cluster_size = log(curr_cluster->doc_pos_index) + 1;
 	printf("dimension picks %1.3f\n", cluster_size);
 
@@ -151,7 +156,8 @@ char *build_dimensions(cluster_t *curr_cluster) {
 
 	insert__hashmap(dimensions, keys[*key_length - 1], keys[0], "", compareCharKey, NULL);
 
-	return keys[0];
+	free(key_length);
+	return keys;
 }
 
 int weight(void *map1_val, void *map2_val) {
