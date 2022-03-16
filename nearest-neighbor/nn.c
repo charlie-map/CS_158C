@@ -29,6 +29,18 @@ int main() {
 
 	cluster_t **cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
 
+	printf("\nCLUSTERS: \n");
+	for (int read_clusters = 0; read_clusters < K; read_clusters++) {
+		printf("\nCLUSTED %d:\n", read_clusters);
+
+		for (int read_cluster_doc = 0; read_cluster_doc < cluster[read_clusters]->doc_pos_index; read_cluster_doc++) {
+			char *title = ((hashmap_body_t *) get__hashmap(doc_map, cluster[read_clusters]->doc_pos[read_cluster_doc], 0))->title;
+			printf("\tDocument %s: %s\n", cluster[read_clusters]->doc_pos[read_cluster_doc], title);
+		}
+	}
+
+	printf("\n\n");
+
 	int *doc_map_length = malloc(sizeof(int));
 	char **doc_map_keys = (char **) keys__hashmap(doc_map, doc_map_length, "");
 
