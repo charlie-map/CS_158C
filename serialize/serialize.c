@@ -66,13 +66,15 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	int *ID_len = malloc(sizeof(int));
 	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
 
-	printf("CHECK ID %d %s\n", *ID_len, *ID);
-
 	total_bag_size += *ID_len - 1;
 
 	// get title
 	int *title_len = malloc(sizeof(int));
+
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
+
+	if (strcmp(title, "kmeans clustering") == 0)
+		printf("ID: %s\n", title);
 
 	// write to title_fp
 	pthread_mutex_lock(&(title_fp->mutex));
@@ -98,6 +100,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	insert__hashmap(block_tag_check, "style", style_value, "-d");
 	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
 	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
+	// printf("%s: %s\n", title, token_page_data);
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));

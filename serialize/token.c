@@ -230,36 +230,59 @@ char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag) {
 	return found_tag;
 }
 
+void tabs(int depth) {
+	for (int i = 0; i < depth; i++) {
+		printf("\t");
+	}
+
+	return;
+}
+
+char *resize_full_data(char *full_data, int *data_max, int data_index) {
+	while (data_index >= *data_max) {
+		*data_max *= 2;
+		full_data = realloc(full_data, sizeof(char) * *data_max);
+	}
+
+	return full_data;
+}
+
 int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *), int currently_blocked) {
 	// update reads specifically for %s's first to place sub tabs into the correct places
 	int add_from_child = 0;
-
+	
 	for (int read_token_data = 0; read_token_data < search_token->data_index; read_token_data++) {
-		if (search_token->data[read_token_data] == '%' && search_token->data[read_token_data + 1] == 's') {
-			// check if we should block adding from the direct descendent:
-			// copy from sub and skip adding this data:
+		if (search_token->data[read_token_data] == '<') {
+			int prev_data_index = data_index;
 			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked,
 				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
 
-			// move child forward
+			if (prev_data_index < data_index && (
+				data_index > 0 && (*full_data)[data_index - 1] != ' ') &&
+				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag)) {
+				// add extra space after token addition for ensure no touching words:
+				*full_data = resize_full_data(*full_data, data_max, data_index + 2);
+				(*full_data)[data_index] = ' ';
+				data_index++;
+			}
+
+			// move to next child
 			add_from_child++;
 
-			// jump to after %s and continue reading
-			read_token_data += 2;
+			// skip other process
 			continue;
 		}
 
-		if (currently_blocked) // skip if the data if blocked
+		// skip if the tag is blocked
+		if (currently_blocked)
 			continue;
 
-		// otherwise add as normal
+		// check full_data has enough space
+		*full_data = resize_full_data(*full_data, data_max, data_index + 1);
+
+		// add next character
 		(*full_data)[data_index] = search_token->data[read_token_data];
 		data_index++;
-
-		if (data_index >= *data_max) {
-			*data_max *= 2;
-			*full_data = realloc(*full_data, sizeof(char) * *data_max);
-		}
 	}
 
 	return data_index;
@@ -401,7 +424,7 @@ tag_reader find_end_comment(FILE *file, char *str_read, char **curr_line, size_t
 	tag_reader tag_read = { .new_search_token = search_token, .type = 2 };
 
 	while (1) {
-		if (search_token > 1 && ((*curr_line)[search_token - 2] == '-' && (*curr_line)[search_token - 1] == '-' && (*curr_line)[search_token] == '>'))
+		if ((*curr_line)[search_token] == '-' && (*curr_line)[search_token + 1] == '-' && (*curr_line)[search_token + 2] == '>')
 			break;
 
 		if ((int) (*curr_line)[search_token] == 10) {
@@ -417,7 +440,7 @@ tag_reader find_end_comment(FILE *file, char *str_read, char **curr_line, size_t
 		search_token++;
 	}
 
-	tag_read.new_search_token = search_token;
+	tag_read.new_search_token = search_token + 2;
 	tag_read.update_str_read = str_read;
 
 	return tag_read;
@@ -576,10 +599,6 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 					continue;
 				}
 
-				// add pointer to sub tree within data:
-				add_token_rolling_data(curr_tree, '%');
-				add_token_rolling_data(curr_tree, 's');
-
 				tag_reader tag_read = read_tag(curr_tree, file, str_read, buffer_reader, buffer_size, search_token);
 				search_token = tag_read.new_search_token;
 
@@ -587,6 +606,9 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 
 				// depending on tag_read.type, choose specific path:
 				if (tag_read.type == 0) {
+					// add pointer to sub tree within data:
+					add_token_rolling_data(curr_tree, '<');
+
 					curr_tree = grab_token_children(curr_tree);
 				}
 
