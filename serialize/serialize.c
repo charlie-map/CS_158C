@@ -179,8 +179,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);
 		}
 
-		// printf("%s", keys[count_sums]);
-		// printf("update full %d rep %s: %s,%d|\n", m_val->full_rep_index, m_val->full_rep, *ID, key_freq);
 		sprintf(m_val->full_rep + sizeof(char) * m_val->full_rep_index, "%s,%d|", *ID, key_freq);
 		m_val->full_rep_index += length;
 		m_val->full_rep[m_val->full_rep_index] = '\0';

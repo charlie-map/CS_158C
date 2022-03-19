@@ -230,14 +230,6 @@ char **token_get_tag_data(token_t *search_token, char *tag_name, int *max_tag) {
 	return found_tag;
 }
 
-void tabs(int depth) {
-	for (int i = 0; i < depth; i++) {
-		printf("\t");
-	}
-
-	return;
-}
-
 char *resize_full_data(char *full_data, int *data_max, int data_index) {
 	while (data_index >= *data_max) {
 		*data_max *= 2;
