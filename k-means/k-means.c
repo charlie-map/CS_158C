@@ -2,8 +2,25 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "k-means.h"
+
+cluster_centroid_data *create_cluster_centroid_data(float data) {
+	cluster_centroid_data *new_ccd = malloc(sizeof(cluster_centroid_data));
+
+	new_ccd->tf_idf = data;
+	new_ccd->standard_deviation = 0;
+	new_ccd->doc_freq = 0;
+
+	return new_ccd;
+}
+
+void destroy_cluster_centroid_data(void *ccd) {
+	free((cluster_centroid_data *) ccd);
+
+	return;
+}
 
 // calculate the distance by going through the centroids word map
 // if the doc doesn't have the word (or vice-versa) then the dot-product
@@ -21,8 +38,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 		void *pre_doc_word_tfidf = get__hashmap(centroid, key, 0);
 		if (!pre_doc_word_tfidf) { // insert into centroid with new data
-			float *new_centroid_data = malloc(sizeof(float));
-			*new_centroid_data = 0.0;
+			cluster_centroid_data *new_centroid_data = create_cluster_centroid_data(0.0);
 			insert__hashmap(centroid, key, new_centroid_data, "", compareCharKey, NULL);
 		}
 
@@ -69,7 +85,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 	// create centroids based off of first k documents
 	cluster_t **cluster = malloc(sizeof(cluster_t *) * k);
 	for (int create_centroid = 0; create_centroid < k; create_centroid++) {
-		hashmap *new_centroid = make__hashmap(0, NULL, destroy_hashmap_float);
+		hashmap *new_centroid = make__hashmap(0, NULL, destroy_cluster_centroid_data);
 
 		int rand_copy_map_val = rand() % *doc_ID_len;
 
@@ -104,21 +120,8 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
 			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], 0));
-			// find most similar centroid using cosine similarity (largest value returned is most similar):
-			int max_centroid = 0;
-			float max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
-			for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
-				
-				float check_max = cosine_similarity(curr_doc->map, curr_doc->sqrt_mag,
-					cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
-
-				if (check_max > max) {
-					max = check_max;
-					max_centroid = curr_centroid;
-				}
-			}
-
-			cluster_t *curr_max_centroid = cluster[max_centroid];
+			
+			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
 			// do something with this information...
 			curr_max_centroid->doc_pos[curr_max_centroid->doc_pos_index++] = doc_ID[find_doc_centroid];
@@ -127,7 +130,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 			if (curr_max_centroid->doc_pos_index == curr_max_centroid->max_doc_pos) {
 				curr_max_centroid->max_doc_pos *= 2;
 
-				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * cluster[max_centroid]->max_doc_pos);
+				curr_max_centroid->doc_pos = realloc(curr_max_centroid->doc_pos, sizeof(char *) * curr_max_centroid->max_doc_pos);
 			}
 		}
 
@@ -166,10 +169,13 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 
 		// for each word in cluster, add up tf-idf from each document in cluster and devide by number of documents
 		for (int word_mean = 0; word_mean < *cluster_word_len; word_mean++) {
-			float *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
-			float prev_centroid_tfidf = *centroid_tfidf;			
-			*centroid_tfidf = 0;
+			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
+			float mean_tfidf = centroid_tfidf->tf_idf;			
+			centroid_tfidf->tf_idf = 0;
+			centroid_tfidf->doc_freq = 0;
 
+			float numerator = 0;
+			float standard_deviation = 0;
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
 				float *doc_tfidf = (float *) get__hashmap(((hashmap_body_t *) get__hashmap(doc,
 					centroids[find_mean_centroid]->doc_pos[check_doc], 0))->map, cluster_word[word_mean], 0);
@@ -177,11 +183,18 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 				if (!doc_tfidf)
 					continue;
 
-				*centroid_tfidf += *doc_tfidf;
+				centroid_tfidf->doc_freq++;
+
+				float numerator_addon = *doc_tfidf - mean_tfidf;
+				numerator += numerator_addon * numerator_addon;
+				centroid_tfidf->tf_idf += *doc_tfidf;
 			}
 
-			*centroid_tfidf /= cluster_size;
-			float tfidf_diff = (*centroid_tfidf) - prev_centroid_tfidf;
+			// calculate rest of standard deviation
+			centroid_tfidf->standard_deviation = sqrt(numerator / (cluster_size - 1));
+
+			centroid_tfidf->tf_idf /= cluster_size;
+			float tfidf_diff = centroid_tfidf->tf_idf - mean_tfidf;
 			mean_shift[find_mean_centroid] += tfidf_diff * tfidf_diff;
 		}
 
@@ -199,17 +212,11 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 
-		float *m1_new_value = malloc(sizeof(float));
-		void *test = get__hashmap(m2, m2_words[cp_value], 0);
+		float m1_value = *(float *) get__hashmap(m2, m2_words[cp_value], 0);
 
-		if (!test) {
-			printf("UH OH %s\n", m2_words[cp_value]);
-			continue;
-		}
+		cluster_centroid_data *new_ccd = create_cluster_centroid_data(m1_value);
 
-		*m1_new_value = *(float *) test;
-
-		insert__hashmap(m1, m2_words[cp_value], m1_new_value, "", compareCharKey, NULL);
+		insert__hashmap(m1, m2_words[cp_value], new_ccd, "", compareCharKey, NULL);
 	}
 
 	free(m2_value_len);
@@ -218,7 +225,24 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 	return 0;
 }
 
-/*
+cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc) {
+	// find most similar centroid using cosine similarity (largest value returned is most similar):
+	int max_centroid = 0;
+	float max = cosine_similarity(doc->map, doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);
+	for (int curr_centroid = 1; curr_centroid < k; curr_centroid++) {
+		
+		float check_max = cosine_similarity(doc->map, doc->sqrt_mag,
+			cluster[curr_centroid]->centroid, cluster[curr_centroid]->sqrt_mag);
+
+		if (check_max > max) {
+			max = check_max;
+			max_centroid = curr_centroid;
+		}
+	}
+
+	return cluster[max_centroid];
+
+ /*
 	Pattern for serialization will be:
 
 	cluster_index cluster_mag doc_amount:doc_id,doc_id,doc_id,
