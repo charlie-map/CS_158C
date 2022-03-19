@@ -158,3 +158,95 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 
 	return words;
 }
+
+int is_delim(char de, char *delims) {
+	return delims[0] == de || delims[1] == de || delims[2] == de;
+}
+
+cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **word_bag, int *word_bag_len) {
+	FILE *read_cluster = fopen(filename, "r");
+
+	if (!read_cluster) {
+		printf("\033[0;31m");
+		printf("\n** Unable to open %s **\n", filename);
+		printf("\033[0;37m");
+	}
+
+	cluster_t **cluster = malloc(sizeof(cluster_t *) * k);
+	int doc_pos_index, max_doc_pos;
+
+	size_t cluster_string_size = sizeof(char);
+	char *cluster_string = malloc(cluster_string_size);
+	
+	int *line_len = malloc(sizeof(int));
+	int *doc_key_len = malloc(sizeof(int));
+
+	for (int curr_cluster = 0; curr_cluster < k; curr_cluster++) {
+		cluster[curr_cluster] = malloc(sizeof(cluster_t));
+
+		getline(&cluster_string, &cluster_string_size, read_cluster);
+		char **cluster_data = split_string(cluster_string, ' ', line_len, "-d-r", is_delim, " :,", NULL);
+
+		// first value is just the cluster mag:
+		cluster[curr_cluster]->sqrt_mag = atof(cluster_data[0]);
+		free(cluster_data[0]);
+
+		// doc pos index
+		doc_pos_index = atoi(cluster_data[1]);
+		free(cluster_data[1]);
+		max_doc_pos = doc_pos_index + 1;
+
+		char **doc_pos = malloc(sizeof(char *) * max_doc_pos);
+
+		cluster[curr_cluster]->doc_pos_index = doc_pos_index;
+		cluster[curr_cluster]->max_doc_pos = max_doc_pos;
+
+		hashmap *centroid = make__hashmap(0, NULL, destroy_cluster_centroid_data);
+
+		// connect each document into the doc_pos
+		// and recompute the centroid hashmap
+		int read_doc;
+		for (read_doc = 0; read_doc < doc_pos_index; read_doc++) {
+			char *doc_key = getKey__hashmap(doc_map, cluster_data[read_doc + 2]);
+			free(cluster_data[read_doc + 2]);
+
+			doc_pos[read_doc] = doc_key;
+
+			hashmap_body_t *curr_doc = get__hashmap(doc_map, doc_key, 0);
+
+			// look at all keys in the document
+			char **curr_doc_keys = (char **) keys__hashmap(curr_doc->map, doc_key_len, "");
+
+			for (int read_curr_doc_data = 0; read_curr_doc_data < *doc_key_len; read_curr_doc_data++) {
+				cluster_centroid_data *data_pt = get__hashmap(centroid, curr_doc_keys[read_curr_doc_data], 0);
+				float curr_doc_value = *(float *) get__hashmap(curr_doc->map, curr_doc_keys[read_curr_doc_data], 0);
+
+				if (!data_pt) {
+					data_pt = create_cluster_centroid_data(curr_doc_value / doc_pos_index);
+
+					insert__hashmap(centroid, curr_doc_keys[read_curr_doc_data], data_pt, "", compareCharKey, NULL);
+					continue;
+				}
+
+				data_pt->tf_idf += curr_doc_value / doc_pos_index;
+				data_pt->doc_freq++;
+			}
+
+			free(curr_doc_keys);
+		}
+
+		free(cluster_data[read_doc + 2]);
+		free(cluster_data);
+
+		cluster[curr_cluster]->doc_pos = doc_pos;
+		cluster[curr_cluster]->centroid = centroid;
+	}
+
+	free(line_len);
+	free(doc_key_len);
+
+	free(cluster_string);
+	fclose(read_cluster);
+
+	return cluster;
+}

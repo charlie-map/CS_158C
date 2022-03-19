@@ -241,11 +241,12 @@ cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc)
 	}
 
 	return cluster[max_centroid];
+}
 
  /*
 	Pattern for serialization will be:
 
-	cluster_index cluster_mag doc_amount:doc_id,doc_id,doc_id,
+	cluster_mag doc_amount:doc_id,doc_id,doc_id,
 	...
 	...
 */
@@ -263,7 +264,7 @@ int cluster_to_file(cluster_t **cluster, int k, char *filename) {
 	for (int serialize_cluster = 0; serialize_cluster < k; serialize_cluster++) {
 		curr_cluster = cluster[serialize_cluster];
 
-		fprintf(reader_file, "%d %1.8f %d: ", serialize_cluster, curr_cluster->sqrt_mag, curr_cluster->doc_pos_index);
+		fprintf(reader_file, "%1.8f %d:", curr_cluster->sqrt_mag, curr_cluster->doc_pos_index);
 
 		for (int read_doc = 0; read_doc < curr_cluster->doc_pos_index; read_doc++) {
 			fprintf(reader_file, "%s,", curr_cluster->doc_pos[read_doc]);

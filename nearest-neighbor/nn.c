@@ -27,7 +27,7 @@ int main() {
 	int *word_bag_len = malloc(sizeof(int));
 	char **word_bag = deserialize("../serialize/predocbags.txt", doc_map, word_bag_len);
 
-	cluster_t **cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	cluster_t **cluster = deserialize_cluster("../k-means/cluster.txt", K, doc_map, word_bag, word_bag_len);
 
 	printf("\nCLUSTERS: \n");
 	for (int read_clusters = 0; read_clusters < K; read_clusters++) {
