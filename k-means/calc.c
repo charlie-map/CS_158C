@@ -30,6 +30,9 @@ int main() {
 		}
 	}
 
+	// save documents to cluster.txt
+	cluster_to_file(cluster, K, "cluster.txt");
+
 	destroy_cluster(cluster, K);
 
 	deepdestroy__hashmap(doc_map);

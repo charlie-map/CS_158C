@@ -18,7 +18,8 @@
 
 #define THREAD_NUMBER 8
 
-#define DTF_THRESHOLD 2
+#define DTF_PERCENT_THRESHOLD 0.4
+#define DTF_LOW_THRESHOLD 4
 
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
@@ -187,7 +188,7 @@ int main() {
 		tf_t *dat = get__hashmap(term_freq, words[fp_word], 0);
 
 		// check that the term has a high enough document frequency
-		if (dat->doc_freq < DTF_THRESHOLD) {
+		if (dat->doc_freq < DTF_LOW_THRESHOLD || (dat->doc_freq / *array_length) > DTF_PERCENT_THRESHOLD) {
 			// remove the key and value from the hashmap
 			delete__hashmap(term_freq, words[fp_word]);
 
@@ -286,28 +287,10 @@ void *data_read(void *meta_ptr) {
 		}
 		pthread_mutex_unlock(ser_pt->sock_mutex);
 
-		// printf("CHECK: %s\n", res_body(wiki_page));
+		//printf("%s\n", res_body(wiki_page));
+
 		// parse the wiki data and write to the bag of words
 		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page), array_body[read_body]);
-
-		// check title for any extra components:
-		token_t *check_title_token = grab_token_by_tag(new_wiki_page_token, "title");
-		char *curr_title_value = data_at_token(check_title_token);
-		if (!strlen(curr_title_value)) {
-			// check for a child:
-			int *title_max_length = malloc(sizeof(int));
-			char *new_title = token_read_all_data(check_title_token, title_max_length, NULL, NULL);
-
-			if (strlen(new_title)) // add it!
-				update_token_data(check_title_token, new_title, title_max_length);
-			else {// bad data
-				printf("An error occured with the title of document: %d\n", read_body);
-				exit(1);
-			}
-
-			free(title_max_length);
-			free(new_title);
-		}
 
 		pthread_mutex_lock(&(ser_pt->term_freq->mutex));
 		int new_doc_length = word_bag(ser_pt->term_freq->runner, ser_pt->title_writer, stopword_trie, new_wiki_page_token, &all_IDs[read_body]);
