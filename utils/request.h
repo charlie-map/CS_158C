@@ -25,6 +25,10 @@ int destroy_socket(socket_t *socket_data);
 
 res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...);
 
+char *create_header(char *HOST, char *PORT, char *request_url, int *url_length, char *post_data);
+
+hashmap *read_headers(char *header_str, int *header_end);
+
 // res is the response body, max_len is the length of the
 // char ** returned. So an input of:
 // ["10", "586", 20], would result in:

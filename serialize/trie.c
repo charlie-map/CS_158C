@@ -46,10 +46,10 @@ typedef struct TrieNode {
 	int end_weight;
 
 	hashmap *children;
-} node_t;
+} trie_node_t;
 
-void node_destroy(void *void_node) {
-	node_t *node = (node_t *) void_node;
+void trie_node_destroy(void *void_node) {
+	trie_node_t *node = (trie_node_t *) void_node;
 
 	if (node->children)
 		deepdestroy__hashmap(node->children);
@@ -62,8 +62,8 @@ void node_destroy(void *void_node) {
 	return;
 }
 
-node_t *node_construct(void *payload, int (*delete)(void *)) {
-	node_t *new_node = malloc(sizeof(node_t));
+trie_node_t *trie_node_construct(void *payload, int (*delete)(void *)) {
+	trie_node_t *new_node = malloc(sizeof(trie_node_t));
 
 	new_node->payload = payload;
 	new_node->destroy_payload = delete;
@@ -71,7 +71,7 @@ node_t *node_construct(void *payload, int (*delete)(void *)) {
 	new_node->thru_weight = 0;
 	new_node->end_weight = 0;
 
-	new_node->children = make__hashmap(0, NULL, node_destroy);
+	new_node->children = make__hashmap(0, NULL, trie_node_destroy);
 
 	return new_node;
 }
@@ -109,7 +109,7 @@ trie_t *trie_create(char *param, ...) {
 	trie_t *new_trie = malloc(sizeof(trie_t));
 
 	new_trie->payload_type = 1;
-	new_trie->root_node = make__hashmap(0, NULL, node_destroy);
+	new_trie->root_node = make__hashmap(0, NULL, trie_node_destroy);
 
 	new_trie->next = default_next;
 	new_trie->comparer = default_comparer;
@@ -155,7 +155,7 @@ trie_t *trie_create(char *param, ...) {
 
 int trie_insert_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) {
 	char *build_alloc_char = trie_meta_data->payload_type ? singleton_maker(value) : NULL;
-	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, 0);
+	trie_node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, "");
 
 	void *get_next_value = trie_meta_data->next(value);
 
@@ -166,7 +166,7 @@ int trie_insert_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) 
 		sub_node->thru_weight++;
 	} else {
 		if (!sub_node) {
-			sub_node = node_construct(build_alloc_char ? build_alloc_char : value, trie_meta_data->delete);
+			sub_node = trie_node_construct(build_alloc_char ? build_alloc_char : value, trie_meta_data->delete);
 			insert__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, sub_node, "", trie_meta_data->comparer, NULL);
 		} else
 			free(build_alloc_char);
@@ -187,7 +187,7 @@ int trie_insert(trie_t *trie, void *p_value) {
 
 int trie_search_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) {
 	char *build_alloc_char = trie_meta_data->payload_type ? singleton_maker(value) : NULL;
-	node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, 0);
+	trie_node_t *sub_node = get__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, "");
 
 	void *get_next_value = trie_meta_data->next(value);
 

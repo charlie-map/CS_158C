@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "k-means.h"
+#include "heap.h"
 
 cluster_centroid_data *create_cluster_centroid_data(float data) {
 	cluster_centroid_data *new_ccd = malloc(sizeof(cluster_centroid_data));
@@ -76,6 +77,10 @@ int destroy_cluster(cluster_t **cluster, int k) {
 	return 0;
 }
 
+int heap_document_vector_distance_compare(void *d1, void *d2) {
+	return *(float *) d1 > *(float *) d2;
+}
+
 cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 	srand(time(NULL));
 	// choosing random k documents
@@ -136,6 +141,32 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 
 		// calculate new averages ([k]means) for each centroid
 		centroid_mean_calculate(cluster, mean_shifts, k, doc);
+
+		// setup initial heap for documents with high distances from their centroid
+		heap_t* document_high_distance_v_centroid = (heap_t*) heap_create(heap_document_vector_distance_compare);
+		int* empty_cluster = malloc(sizeof(int) * (k - 1)); // keep track of empty clusters
+		int empty_cluster_index = 0;
+
+		// loop through centroids
+		cluster_t* curr_cluster;
+		document_vector_t* curr_document_vector;
+		for (int look_at_cluster = 0; look_at_cluster < k; look_at_cluster++) {
+			curr_cluster = cluster[look_at_cluster];
+
+			// check for empty clusters
+			if (curr_cluster->doc_pos_index == 0) {
+				empty_cluster[empty_cluster_index] = look_at_cluster;
+				empty_cluster_index++;
+			}
+
+			// look for document vector with highest distance from centroid
+			int most_distance_doc_pos = 0;
+			curr_document_vector = get__hashmap(doc, curr_cluster->doc_pos[0], "");
+			float most_distance_doc_value = cosine_similarity(curr_document_vector->, )
+			for (int find_distant_doc = 1; find_distant_doc < curr_cluster->doc_pos_index; find_distant_doc++) {
+
+			}
+		}
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
 
 	free(doc_ID_len);
@@ -147,7 +178,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 	return cluster;
 }
 
-int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold) {
+int has_changed(float* mean_shift, float* prev_mean_shift, int k, float threshold) {
 	for (int check_mean = 0; check_mean < k; check_mean++) {
 		float diff = mean_shift[check_mean] - prev_mean_shift[check_mean];
 		if ((diff > 0 && diff > threshold) || (diff < 0 && diff * -1 > threshold))
@@ -157,19 +188,19 @@ int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshol
 	return 0;
 }
 
-float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap *doc) {
+float *centroid_mean_calculate(cluster_t** centroids, float* mean_shift, int k, hashmap* doc) {
 	// for each centroid
 	for (int find_mean_centroid = 0; find_mean_centroid < k; find_mean_centroid++) {
 		mean_shift[find_mean_centroid] = 0;
 		// calculate a average for each word in centroid
 		int cluster_size = centroids[find_mean_centroid]->doc_pos_index;
 
-		int *cluster_word_len = malloc(sizeof(int));
-		char **cluster_word = (char **) keys__hashmap(centroids[find_mean_centroid]->centroid, cluster_word_len, "");
+		int* cluster_word_len = malloc(sizeof(int));
+		char** cluster_word = (char**) keys__hashmap(centroids[find_mean_centroid]->centroid, cluster_word_len, "");
 
 		// for each word in cluster, add up tf-idf from each document in cluster and devide by number of documents
 		for (int word_mean = 0; word_mean < *cluster_word_len; word_mean++) {
-			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
+			cluster_centroid_data* centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
 			float mean_tfidf = centroid_tfidf->tf_idf;			
 			centroid_tfidf->tf_idf = 0;
 			centroid_tfidf->doc_freq = 0;
@@ -177,7 +208,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 			float numerator = 0;
 			float standard_deviation = 0;
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
-				float *doc_tfidf = (float *) get__hashmap(((hashmap_body_t *) get__hashmap(doc,
+				float* doc_tfidf = (float*) get__hashmap(((hashmap_body_t*) get__hashmap(doc,
 					centroids[find_mean_centroid]->doc_pos[check_doc], 0))->map, cluster_word[word_mean], 0);
 
 				if (!doc_tfidf)
@@ -206,7 +237,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 }
 
 // take all values in m2 and copy them into m1
-int copy__hashmap(hashmap *m1, hashmap *m2) {
+int copy__hashmap(hashmap* m1, hashmap* m2) {
 	int *m2_value_len = malloc(sizeof(int));
 	char **m2_words = (char **) keys__hashmap(m2, m2_value_len, "");
 

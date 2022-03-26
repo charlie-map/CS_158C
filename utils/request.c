@@ -15,11 +15,95 @@
 #include <unistd.h>
 #include <netdb.h>
 
-#include "stack.h"
 #include "helper.h"
 #include "request.h"
 
 #define MAXLINE 4096
+
+/*
+	 _             _    
+ ___| |_ __ _  ___| | __
+/ __| __/ _` |/ __| |/ /
+\__ \ || (_| | (__|   < 
+|___/\__\__,_|\___|_|\_\
+*/
+typedef struct LinkedList {
+	void *payload;
+
+	struct LinkedList *next;
+} stack_ll_t;
+
+typedef struct Stack {
+	stack_ll_t *stack_head;
+
+	int size;
+} stack_tv2;
+
+stack_tv2 *stack_create() {
+	stack_tv2 *new_stack = malloc(sizeof(stack_tv2));
+
+	new_stack->stack_head = NULL;
+	new_stack->size = 0;
+
+	return new_stack;
+}
+
+int stack_push(stack_tv2 *stack, void *payload) {
+	stack_ll_t *new_head = malloc(sizeof(stack_ll_t));
+
+	new_head->payload = payload;
+	new_head->next = NULL;
+
+	if (stack->stack_head) {
+		new_head->next = stack->stack_head;
+	}
+
+	stack->stack_head = new_head;
+	stack->size++;
+
+	return 0;
+}
+
+void *stack_peek(stack_tv2 *stack) {
+	return stack->stack_head->payload;
+}
+
+void *stack_pop(stack_tv2 *stack) {
+	stack_ll_t *pull_head = stack->stack_head;
+
+	if (!pull_head)
+		return NULL;
+
+	// update head
+	stack->stack_head = pull_head->next;
+
+	void *pull_head_payload = pull_head->payload;
+
+	free(pull_head);
+
+	stack->size--;
+	return pull_head_payload;
+}
+
+int stack_size(stack_tv2 *stack) {
+	return stack->size;
+}
+
+int stack_destroy(stack_tv2 *stack) {
+	while (stack->stack_head) {
+		stack_ll_t *next = stack->stack_head->next;
+
+		free(stack->stack_head);
+
+		stack->stack_head = next;
+	}
+
+	free(stack);
+
+	return 0;
+}
+
+
 
 struct Response {
 	hashmap *headers;
@@ -249,6 +333,7 @@ hashmap *read_headers(char *header_str, int *header_end) {
 	return header_map;
 }
 
+
 // takes request url and will build the full url:
 res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
@@ -286,7 +371,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	// read header
 	int *header_end = malloc(sizeof(int));
 	hashmap *headers = read_headers(header_read, header_end);
-	int content_length = atoi(get__hashmap(headers, "Content-Length", 0));
+	int content_length = atoi(get__hashmap(headers, "Content-Length", ""));
 
 	size_t full_req_len = sizeof(char) * content_length;
 	char *buffer = malloc(full_req_len + sizeof(char));
@@ -315,6 +400,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	return res_create(headers, buffer, full_req_len + 1);
 }
 
+// 0 for client, 1 for server
 socket_t *get_socket(char *HOST, char *PORT) {
 	// connection stuff
 	//int *sock_fd = malloc(sizeof(int)); // listen on sock_fd
@@ -323,6 +409,7 @@ socket_t *get_socket(char *HOST, char *PORT) {
 	struct sockaddr_storage their_addr; // connector's address information
 	struct sigaction sa;
 
+	int yes = 1;
 	int status;
 
 	memset(&hints, 0, sizeof(hints)); // make sure the struct is empty
@@ -348,7 +435,7 @@ socket_t *get_socket(char *HOST, char *PORT) {
 			perror("client: connect");
 			exit(1);
 		}
-
+		
 		break;
 	}
 

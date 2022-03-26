@@ -22,7 +22,7 @@ void destroy_hashmap_val(void *ptr) {
 }
 
 void *is_block(void *hmap, char *tag) {
-	return get__hashmap((hashmap *) hmap, tag, 0);
+	return get__hashmap((hashmap *) hmap, tag, "");
 }
 
 tf_t *new_tf_t(char *ID) {
@@ -58,23 +58,24 @@ int is_m(void *tf, void *extra) {
 	Now index_fp, title_fp, and idf_hash need mutex locking,
 	so bring mutex attr with them
 */
-int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, char **ID) {
+int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
+	token_t *full_page, char **ID, document_vector_t *opt_doc) {
 	int total_bag_size = 0;
 
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
 	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+	if (opt_doc)
+		opt_doc->id = *ID;
 
 	total_bag_size += *ID_len - 1;
 
 	// get title
 	int *title_len = malloc(sizeof(int));
-
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
-
-	if (strcmp(title, "kmeans clustering") == 0)
-		printf("ID: %s\n", title);
+	if (opt_doc)
+		opt_doc->title = title;
 
 	// write to title_fp
 	pthread_mutex_lock(&(title_fp->mutex));
@@ -100,7 +101,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	insert__hashmap(block_tag_check, "style", style_value, "-d");
 	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
 	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
-	// printf("%s: %s\n", title, token_page_data);
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));
@@ -133,17 +133,30 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		char *prev_hash_key = (char *) getKey__hashmap(term_freq, full_page_data[add_hash]);
 
 		if (prev_hash_key) {
-			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], 0);
+			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], "");
 
-			free(full_page_data[add_hash]);
-
-			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0)
+			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0) {
 				hashmap_freq->curr_term_freq++;
-			else { // reset features
+
+				if (opt_doc) {
+					float *opt_map_value = get__hashmap(opt_doc->map, full_page_data[add_hash], "");
+
+					if (opt_map_value)
+						*opt_map_value++;
+				}
+			} else { // reset features
 				hashmap_freq->curr_term_freq = 1;
 				hashmap_freq->curr_doc_id = *ID;
 
 				hashmap_freq->doc_freq++;
+
+				// setup document_vector_t if there
+				if (opt_doc) {
+					float *new_opt_map_value = malloc(sizeof(float));
+					*new_opt_map_value = 1;
+					
+					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
+				}
 			}
 
 			continue;
@@ -163,7 +176,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	char **keys = (char **) keys__hashmap(term_freq, key_len, "m", is_m, *ID);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
-		tf_t *m_val = (tf_t *) get__hashmap(term_freq, keys[count_sums], 0);
+		tf_t *m_val = (tf_t *) get__hashmap(term_freq, keys[count_sums], "");
 		int key_freq = m_val->curr_term_freq;
 		sum_of_squares += key_freq * key_freq;
 
@@ -183,15 +196,9 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		m_val->full_rep_index += length;
 		m_val->full_rep[m_val->full_rep_index] = '\0';
 	}
-	char *sum_square_char = malloc(sizeof(char) * 13);
-	memset(sum_square_char, '\0', sizeof(char) * 13);
 
-	sprintf(sum_square_char, " %d\n", sum_of_squares);
-	total_bag_size += strlen(sum_square_char);
-	fputs(sum_square_char, title_fp->runner);
+	fprintf(title_fp->runner, " %d\n", sum_of_squares);
 	pthread_mutex_unlock(&(title_fp->mutex));
-
-	free(sum_square_char);
 
 	free(keys);
 	free(key_len);
@@ -200,12 +207,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	free(full_page_data);
 
 	return 0;
-}
-
-void destroy_hashmap_float(void *v) {
-	free((float *) v);
-
-	return;
 }
 
 int compareFloatKey(void *v1, void *v2) {

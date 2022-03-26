@@ -250,8 +250,7 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
 
 			if (prev_data_index < data_index && (
-				data_index > 0 && (*full_data)[data_index - 1] != ' ') &&
-				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag)) {
+				data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
 				// add extra space after token addition for ensure no touching words:
 				*full_data = resize_full_data(*full_data, data_max, data_index + 2);
 				(*full_data)[data_index] = ' ';
@@ -326,16 +325,13 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		return getdelim(curr_line, buffer_size, 10, fp);
 
 	// otherwise search through str_read for a newline
-	int str_read_index = -1;
+	int str_read_index = 0;
 
-	while (*str_read) {
-		if (str_read_index == -1)
-			str_read_index = 0;
-
-		if ((int) *str_read == 10)
+	while (str_read[0] != '\0') {
+		if (str_read[0] == '\n')
 			break;
 
-		(*curr_line)[str_read_index] = *str_read;
+		(*curr_line)[str_read_index] = str_read[0];
 
 		str_read += sizeof(char);
 		str_read_index++;
@@ -350,13 +346,13 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		(*curr_line)[str_read_index] = '\0';
 	}
 
-	if (str_read_index == -1)
-		return str_read_index;
+	if (str_read[0] == '\0' && str_read_index == 0)
+		return -1;
 
 	(*curr_line)[str_read_index] = '\n';
 	(*curr_line)[str_read_index + 1] = '\0';
 
-	return str_read_index + 1;
+	return str_read_index + (str_read[0] != '\0');
 }
 
 int find_close_tag(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_close) {
@@ -600,7 +596,7 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 				if (tag_read.type == 0) {
 					// add pointer to sub tree within data:
 					add_token_rolling_data(curr_tree, '<');
-
+					
 					curr_tree = grab_token_children(curr_tree);
 				}
 

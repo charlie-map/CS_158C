@@ -241,56 +241,130 @@ void **keys__hashmap(hashmap *hash__m, int *max_key, char *p, ...) {
 			free()ing of this array will leave the key to that array
 			pointing to unknown memory. However, the freeing of the
 			returned struct will be left to the user
-	-- flag:
-		0: normal behavior
-		1: return map key as well
+	-- TERU update: update for "wildcarding" the get request
+		use "i" to implement this and an
+			int is_match(void *, void *);
+		to compare keys
+		leave blank for no is_match option
+
+		use "w" to implement a weight function
+			int is_lower(void *, void *);
+		to compare values
+		leave blank for no is_lower option
+
+		use "f" for using a flag (for serialization)
+			if f is included, this also returns map key as well
 */
-void *get__hashmap(hashmap *hash__m, void *key, int flag) {
+void *get__hashmap(hashmap *hash__m, void *key, char *ep, ...) {
+	if (!hash__m)
+		return NULL;
+
+	int flag = 0;
+	int (*is_match)(void *, void *) = NULL;
+	int (*is_lower)(void *, void *) = NULL;
+
+	va_list new_poly_reader;
+	va_start(new_poly_reader, ep);
+
+	for (int check_ep = 0; ep[check_ep]; check_ep++) {
+		if (ep[check_ep] == 'w') // found match
+			is_lower = va_arg(new_poly_reader, int (*)(void *, void *));
+		if (ep[check_ep] == 'i') // found match
+			is_match = va_arg(new_poly_reader, int (*)(void *, void *));
+		if (ep[check_ep] == 'f') // found match
+			flag = 1;
+	}
+
 	// get hash position
-	int mapPos = hash(key) % hash__m->hashmap__size;
+	int mapPos;
 
-	ll_main_t *ll_search = hash__m->map[mapPos];
-	// search through the bucket to find any keys that match
-	while (ll_search) {
-		if (ll_search->key.compareKey(ll_search->key.key, key)) { // found a match
+	for (mapPos = is_match ? 0 : hash(key) % hash__m->hashmap__size; mapPos < hash__m->hashmap__size; mapPos++) {
+		ll_main_t *ll_search = hash__m->map[mapPos];
+		
+		// search through the bucket to find any keys that match
+		while (ll_search) {
+			if (ll_search->key.compareKey(ll_search->key.key, key)) { // found a match
 
-			hashmap__response *returnMeat;
+				hashmap__response *returnMeat;
 
-			if (flag || hash__m->hash__type) {
-				returnMeat = malloc(sizeof(hashmap__response));
-				returnMeat->key = ll_search->key.key;
-			}
-			// depending on the type and mode, this will just return
-			// the value:
-			if (hash__m->hash__type == 0) {
-				if (flag) {
-					returnMeat->payload = ll_search->ll_meat;
-					returnMeat->payload__length = 1;
-				} else
-					return ll_search->ll_meat;
-			} else {
-
-				if (ll_search->isArray) {
-					returnMeat->payload = ll_search->ll_meat;
-					returnMeat->payload__length = ll_search->arrIndex + 1;
-				} else { // define array
-					void *ll_tempMeatStorage = ll_search->ll_meat;
-
-					ll_search->max__arrLength = 2;
-					ll_search->arrIndex = 0;
-
-					ll_search->ll_meat = malloc(sizeof(void *) * ll_search->max__arrLength * 2);
-					((void **) ll_search->ll_meat)[0] = ll_tempMeatStorage;
-
-					returnMeat->payload = ll_search->ll_meat;
-					returnMeat->payload__length = ll_search->arrIndex + 1;
+				if (flag || hash__m->hash__type) {
+					returnMeat = malloc(sizeof(hashmap__response));
+					returnMeat->key = ll_search->key.key;
 				}
+				// depending on the type and mode, this will just return
+				// the value:
+				if (hash__m->hash__type == 0) {
+					if (flag) {
+						returnMeat->payload = ll_search->ll_meat;
+						returnMeat->next = NULL;
+					} else
+						return ll_search->ll_meat;
+				} else {
+
+					if (ll_search->isArray) {
+						returnMeat->payload = ((void **) ll_search->ll_meat)[0];
+						returnMeat->next = NULL;
+
+						hashmap__response *set_intern_meat = returnMeat;
+
+						for (int set_return_meat = 1; set_return_meat < ll_search->arrIndex + 1; set_return_meat++) {
+							// if is_lower exists, find position in return:
+							if (is_lower) {
+								set_intern_meat = returnMeat;
+
+								// search for the position of the next value based on is_lower
+								while (set_intern_meat->next && is_lower(set_intern_meat->next->payload, ((void **) ll_search->ll_meat)[set_return_meat])) {
+									set_intern_meat = set_intern_meat->next;
+								}
+
+								hashmap__response *new_node_element = malloc(sizeof(hashmap__response));
+								new_node_element->payload = ((void **) ll_search->ll_meat)[set_return_meat];
+
+								// check for setting as head
+								if (is_lower(((void **) ll_search->ll_meat)[set_return_meat], set_intern_meat->payload)) {
+									returnMeat->next = returnMeat;
+									returnMeat = new_node_element;
+								} else { // insert as next of set_intern_meat
+									hashmap__response *curr_next = set_intern_meat->next;
+
+									// splicing ll_meat value into the linked list
+									set_intern_meat->next = new_node_element;
+									new_node_element->next = curr_next;
+								}
+
+								continue;
+							}
+
+							// otherwise add the value at the end of the linked list
+							set_intern_meat->next = malloc(sizeof(hashmap__response));
+							set_intern_meat = set_intern_meat->next;
+
+							set_intern_meat->payload = ((void **) ll_search->ll_meat)[set_return_meat];
+						}
+					} else { // define array
+						void *ll_tempMeatStorage = ll_search->ll_meat;
+
+						ll_search->max__arrLength = 2;
+						ll_search->arrIndex = 0;
+
+						ll_search->ll_meat = malloc(sizeof(void *) * ll_search->max__arrLength * 2);
+						((void **) ll_search->ll_meat)[0] = ll_tempMeatStorage;
+
+						returnMeat->payload = ll_tempMeatStorage;
+						returnMeat->next = NULL;
+
+						ll_search->isArray = 1;
+					}
+				}
+
+				return returnMeat;
 			}
 
-			return returnMeat;
+			ll_search = ll_next(ll_search);
 		}
 
-		ll_search = ll_next(ll_search);
+		if (!is_match)
+			break;
 	}
 
 	// no key found
@@ -312,10 +386,16 @@ void *getKey__hashmap(hashmap *hash__m, void *key) {
 	return NULL;
 }
 
-void destroy__hashmap_response(hashmap__response *map_res) {
-	free(map_res);
+// scroll through linked list and delete headers
+int clear__hashmap__response(hashmap__response *hr) {
+	while (hr) {
+		hashmap__response *n = hr->next;
+		free(hr);
 
-	return;
+		hr = n;
+	}
+
+	return 0;
 }
 
 int print__hashmap(hashmap *hash__m) {
@@ -619,6 +699,76 @@ int insert__hashmap(hashmap *hash__m, void *key, void *value, ...) {
 	}	
 
 	METAinsert__hashmap(hash__m, inserter, value);
+
+	return 0;
+}
+
+char *read_key(char *buffer, int *key_len) {
+	*key_len = 8;
+	int key_index = 0;
+
+	char *key = malloc(sizeof(char) * *key_len);
+
+	while (buffer[key_index] != '|') {
+		key[key_index] = buffer[key_index];
+		key_index++;
+
+		if (key_index + 1 == *key_len) {
+			*key_len *= 2;
+
+			key = realloc(key, sizeof(char) * *key_len);
+		}
+
+		key[key_index] = '\0';
+	}
+
+	*key_len = key_index;
+	return key;
+}
+// assumes the pattern:
+// name|Charlie\nname|Jack
+// NOTE: hashmap should have a destroyValue function
+int batchInsert__hashmap(hashmap *hash__m, char *filename) {
+	void (*printKey)(void *) = printCharKey;
+	int (*compareKey)(void *, void *) = compareCharKey;
+	void (*destroyKey)(void *) = destroyCharKey;
+
+	FILE *fp = fopen(filename, "r");
+
+	if (!fp) {
+		printf("\033[0;31m");
+		printf("\n** Batch Insert File Error **\n");
+		printf("\033[0;37m");
+
+		return 1;
+	}
+
+	size_t buff_size = sizeof(char) * 8;
+	char *buffer = malloc(buff_size);
+	int buffer_len;
+
+	int *key_len = malloc(sizeof(int));
+	while ((buffer_len = getline(&buffer, &buff_size, fp)) != -1) {
+		buffer_len = strlen(buffer);
+		vtableKeyStore newtable = { .key = read_key(buffer, key_len),
+									.printKey = printKey,
+									.compareKey = compareKey,
+									.destroyKey = destroyKey };
+
+		// read value starting from where key_len stopped
+		char *value = malloc(sizeof(char) * (buffer_len - *key_len - 1));
+		int cp_value;
+		for (cp_value = 0; cp_value < buffer_len - *key_len - 2; cp_value++) {
+			value[cp_value] = *(buffer + sizeof(char) * (*key_len + cp_value + 1));
+		}
+		value[cp_value] = '\0';
+
+		METAinsert__hashmap(hash__m, newtable, value);
+	}
+
+	free(buffer);
+	free(key_len);
+	fclose(fp);
 
 	return 0;
 }
