@@ -61,7 +61,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 int copy__hashmap(hashmap *m1, hashmap *m2);
 
-float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, hashmap *doc);
+float *centroid_mean_calculate(cluster_t** centroids, int start_pos, int k, float* mean_shift, hashmap* doc);
 int has_changed(float *mean_shift, float *prev_mean_shift, int k, float threshold);
 
 int destroy_cluster(cluster_t **cluster, int k) {
@@ -76,6 +76,10 @@ int destroy_cluster(cluster_t **cluster, int k) {
 
 	return 0;
 }
+
+typedef struct DocumentVectorHeapRep {
+	int curr_cluster, doc_pos_index;
+} document_vector_heap_rep_t;
 
 int heap_document_vector_distance_compare(void *d1, void *d2) {
 	return *(float *) d1 > *(float *) d2;
@@ -140,7 +144,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		}
 
 		// calculate new averages ([k]means) for each centroid
-		centroid_mean_calculate(cluster, mean_shifts, k, doc);
+		centroid_mean_calculate(cluster, 0, k, mean_shifts, doc);
 
 		// setup initial heap for documents with high distances from their centroid
 		heap_t* heap_document_high_distance_v_centroid = (heap_t*) heap_create(heap_document_vector_distance_compare);
@@ -157,15 +161,22 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 			if (curr_cluster->doc_pos_index == 0) {
 				empty_cluster[empty_cluster_index] = look_at_cluster;
 				empty_cluster_index++;
+
+				continue;
 			}
 
 			// look for document vector with highest distance from centroid
-			int* most_distance_doc_pos = malloc(sizeof(int)); *most_distance_doc_pos = 0;
+			document_vector_heap_rep_t* most_distance_doc_pos = malloc(sizeof(document_vector_heap_rep_t));
+			most_distance_doc_pos->curr_cluster = look_at_cluster;
+			most_distance_doc_pos->doc_pos_index = 0;
+
 			curr_document_vector = get__hashmap(doc, curr_cluster->doc_pos[0], "");
 			float* most_distance_doc_value = malloc(sizeof(float));
 			*most_distance_doc_value = cosine_similarity(curr_document_vector->map, curr_document_vector->sqrt_mag,
 				curr_cluster->centroid, curr_cluster->sqrt_mag);
 			for (int find_distant_doc = 1; find_distant_doc < curr_cluster->doc_pos_index; find_distant_doc++) {
+				if (!curr_cluster->doc_pos[find_distant_doc])
+					continue;
 
 				curr_document_vector = get__hashmap(doc, curr_cluster->doc_pos[find_distant_doc], "");
 				float check_distance_doc_value = cosine_similarity(curr_document_vector->map, curr_document_vector->sqrt_mag,
@@ -173,7 +184,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 
 				if (check_distance_doc_value > *most_distance_doc_value) {
 
-					*most_distance_doc_pos = find_distant_doc;
+					most_distance_doc_pos->doc_pos_index = find_distant_doc;
 					*most_distance_doc_value = check_distance_doc_value;
 				}
 			}
@@ -184,6 +195,27 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 
 		// heap is loaded
 		// search through empty_cluster for clusters that need documents
+		for (int setup_empty_cluster = 0; setup_empty_cluster < empty_cluster_index; setup_empty_cluster++) {
+			curr_cluster = cluster[empty_cluster[setup_empty_cluster]];
+
+			document_vector_heap_rep_t* document_vector_to_add_pos = heap_pop(heap_document_high_distance_v_centroid);
+
+			// set position in original cluster to NULL
+			char *document_vector_ID = cluster[document_vector_to_add_pos->curr_cluster]->doc_pos[document_vector_to_add_pos->doc_pos_index];
+			cluster[document_vector_to_add_pos->curr_cluster]->doc_pos[document_vector_to_add_pos->doc_pos_index] = NULL;
+
+			curr_cluster->doc_pos[0] = document_vector_ID;
+			curr_cluster->doc_pos_index++;
+
+			// recalculate centroid means
+			centroid_mean_calculate(cluster, empty_cluster[setup_empty_cluster], empty_cluster[setup_empty_cluster] + 1, mean_shifts, doc);
+			centroid_mean_calculate(cluster, document_vector_to_add_pos->curr_cluster, document_vector_to_add_pos->curr_cluster + 1, mean_shifts, doc);
+		
+			free(document_vector_to_add_pos);
+		}
+
+		heap_destroy(&heap_document_high_distance_v_centroid);
+		free(empty_cluster);
 	} while(has_changed(mean_shifts, prev_mean_shifts, k, cluster_threshold));
 
 	free(doc_ID_len);
@@ -205,9 +237,9 @@ int has_changed(float* mean_shift, float* prev_mean_shift, int k, float threshol
 	return 0;
 }
 
-float *centroid_mean_calculate(cluster_t** centroids, float* mean_shift, int k, hashmap* doc) {
+float *centroid_mean_calculate(cluster_t** centroids, int start_pos, int k, float* mean_shift, hashmap* doc) {
 	// for each centroid
-	for (int find_mean_centroid = 0; find_mean_centroid < k; find_mean_centroid++) {
+	for (int find_mean_centroid = start_pos; find_mean_centroid < k; find_mean_centroid++) {
 		mean_shift[find_mean_centroid] = 0;
 		// calculate a average for each word in centroid
 		int cluster_size = centroids[find_mean_centroid]->doc_pos_index;
@@ -225,6 +257,9 @@ float *centroid_mean_calculate(cluster_t** centroids, float* mean_shift, int k, 
 			float numerator = 0;
 			float standard_deviation = 0;
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
+				if (!centroids[find_mean_centroid]->doc_pos[check_doc])
+					continue;
+
 				float* doc_tfidf = (float*) get__hashmap(((hashmap_body_t*) get__hashmap(doc,
 					centroids[find_mean_centroid]->doc_pos[check_doc], ""))->map, cluster_word[word_mean], "");
 
@@ -315,6 +350,9 @@ int cluster_to_file(cluster_t **cluster, int k, char *filename) {
 		fprintf(reader_file, "%1.8f %d:", curr_cluster->sqrt_mag, curr_cluster->doc_pos_index);
 
 		for (int read_doc = 0; read_doc < curr_cluster->doc_pos_index; read_doc++) {
+			if (!curr_cluster->doc_pos[read_doc])
+				continue;
+
 			fprintf(reader_file, "%s,", curr_cluster->doc_pos[read_doc]);
 		}
 

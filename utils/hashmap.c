@@ -256,7 +256,7 @@ void **keys__hashmap(hashmap *hash__m, int *max_key, char *p, ...) {
 			if f is included, this also returns map key as well
 */
 void *get__hashmap(hashmap *hash__m, void *key, char *ep, ...) {
-	if (!hash__m)
+	if (!hash__m || !((vtableKeyStore *) key)->key)
 		return NULL;
 
 	int flag = 0;

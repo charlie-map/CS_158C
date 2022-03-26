@@ -204,6 +204,7 @@ void *heap_pop(heap_t *head) {
 	// extract payload to return
 	void *prevMinPayload = prevMin->payload;
 	// delete the previous min
+	free(prevMin->weight);
 	free(prevMin);
 	return prevMinPayload;
 }
@@ -262,6 +263,8 @@ int METAheap_destroy(heap_node *start) {
 			METAheap_destroy(start->child);
 
 		buffer = start->heap__right;
+		free(start->payload);
+		free(start->weight);
 		free(start);
 		start = buffer;
 	} while (start != initialNode);
