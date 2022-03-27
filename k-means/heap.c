@@ -253,9 +253,9 @@ int heap_decrease_key(heap_t *head, void *key, void *newWeight) {
 	return 0;
 }
 
-int METAheap_destroy(heap_node *start) {
-	heap_node *initialNode = start;
-	heap_node *buffer;
+int METAheap_destroy(heap_node* start) {
+	heap_node* initialNode = start;
+	heap_node* buffer;
 
 	do {
 		// delete all children

@@ -25,6 +25,7 @@ document_vector_t *create_document_vector(char *id, char *title, float mag) {
 }
 
 void destroy_hashmap_body(document_vector_t *body_hash) {
+	free(body_hash->id);
 	free(body_hash->title);
 
 	deepdestroy__hashmap(body_hash->map);

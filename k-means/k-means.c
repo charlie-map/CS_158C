@@ -98,7 +98,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 
 		int rand_copy_map_val = rand() % *doc_ID_len;
 
-		hashmap_body_t *copyer_hashmap = get__hashmap(doc, doc_ID[rand_copy_map_val], "");
+		document_vector_t *copyer_hashmap = get__hashmap(doc, doc_ID[rand_copy_map_val], "");
 		copy__hashmap(new_centroid, copyer_hashmap->map);
 
 		cluster[create_centroid] = malloc(sizeof(cluster_t));
@@ -128,7 +128,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		// go through non-centroid documents and assign them to centroids
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
-			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], ""));
+			document_vector_t *curr_doc = ((document_vector_t *) get__hashmap(doc, doc_ID[find_doc_centroid], ""));
 			
 			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
@@ -199,6 +199,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 			curr_cluster = cluster[empty_cluster[setup_empty_cluster]];
 
 			document_vector_heap_rep_t* document_vector_to_add_pos = heap_pop(heap_document_high_distance_v_centroid);
+			printf("VEC %d\n", document_vector_to_add_pos->doc_pos_index);
 
 			// set position in original cluster to NULL
 			char *document_vector_ID = cluster[document_vector_to_add_pos->curr_cluster]->doc_pos[document_vector_to_add_pos->doc_pos_index];
@@ -260,7 +261,7 @@ float *centroid_mean_calculate(cluster_t** centroids, int start_pos, int k, floa
 				if (!centroids[find_mean_centroid]->doc_pos[check_doc])
 					continue;
 
-				float* doc_tfidf = (float*) get__hashmap(((hashmap_body_t*) get__hashmap(doc,
+				float* doc_tfidf = (float*) get__hashmap(((document_vector_t*) get__hashmap(doc,
 					centroids[find_mean_centroid]->doc_pos[check_doc], ""))->map, cluster_word[word_mean], "");
 
 				if (!doc_tfidf)
@@ -308,7 +309,7 @@ int copy__hashmap(hashmap* m1, hashmap* m2) {
 	return 0;
 }
 
-cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc) {
+cluster_t *find_closest_cluster(cluster_t **cluster, int k, document_vector_t *doc) {
 	// find most similar centroid using cosine similarity (largest value returned is most similar):
 	int max_centroid = 0;
 	float max = cosine_similarity(doc->map, doc->sqrt_mag, cluster[0]->centroid, cluster[0]->sqrt_mag);

@@ -5,6 +5,7 @@
 
 #include "k-means.h"
 #include "deserialize.h"
+#include "document-vector.h"
 #include "../utils/hashmap.h"
 
 #define K 48
@@ -33,7 +34,7 @@ int main() {
 			if (!cluster[check_cluster]->doc_pos[read_cluster_doc])
 				continue;
 
-			char *title = ((hashmap_body_t *) get__hashmap(doc_map, cluster[check_cluster]->doc_pos[read_cluster_doc], ""))->title;
+			char *title = ((document_vector_t*) get__hashmap(doc_map, cluster[check_cluster]->doc_pos[read_cluster_doc], ""))->title;
 			printf("Document %s: %s\n", cluster[check_cluster]->doc_pos[read_cluster_doc], title);
 		}
 	}
@@ -51,6 +52,8 @@ int main() {
 
 	free(word_bag_len);
 	free(word_bag);
+	free(ID_len);
+	free(ID);
 
 	return 0;
 }
